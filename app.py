@@ -94,6 +94,18 @@ if st.session_state.idx < len(fields):
 # This section only appears when index >= len(fields)
 if st.session_state.idx >= len(fields):
     st.divider()
+    
+    # --- NEW: REVIEW SECTION ---
+    st.header("📋 Review Your Answers")
+    st.info("Please check for spelling errors before submitting.")
+    # Display the answers clearly so the user can verify them
+    for key, value in st.session_state.form_data.items():
+        # Get a readable label from the config
+        label = current_config["fields"][key]["description"]
+        st.text_input(label, value=value, disabled=True)
+    st.divider()
+    # ---------------------------
+
     st.header("🆔 Identity Verification")
     c1, c2 = st.columns(2)
     selfie = c1.camera_input("Selfie")
@@ -102,6 +114,9 @@ if st.session_state.idx >= len(fields):
     st.write("Sign Below:")
     sig = st_canvas(stroke_width=2, height=150, key="sig")
     
+    # TWILIO CONSENT LINE
+    st.caption("By clicking Submit, I agree to receive SMS updates about my case.")
+
     if st.button("Finalize & Submit"):
         if selfie and gov_id and sig.image_data is not None:
             with st.spinner("Processing with FormFlux..."):
@@ -134,4 +149,3 @@ if st.session_state.idx >= len(fields):
                 
                 st.success("✅ Submission Sent via FormFlux!")
                 st.balloons()
-                
