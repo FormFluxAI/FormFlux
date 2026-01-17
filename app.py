@@ -38,114 +38,157 @@ if api_key and api_key.startswith("sk-") and api_key != "mock":
 with st.sidebar:
     st.header("FormFlux Intake")
     st.caption("Owner: Justin White")
-    if client:
-        st.success("🟢 AI Connected")
-    else:
-        st.info("🟡 Mock Mode Active")
-        
     selected_name = st.selectbox("Select Document", list(FORM_LIBRARY.keys()))
-    current_config = FORM_LIBRARY[selected_name]
     
+    # Progress Bar Logic
+    if "idx" in st.session_state and "total_steps" in st.session_state:
+        progress = st.session_state.idx / st.session_state.total_steps
+        st.progress(progress, text=f"Progress: {int(progress*100)}%")
+
     with st.expander("💼 Admin Dashboard"):
-        admin_pass = st.secrets.get("ADMIN_PASS", "admin")
-        if st.text_input("Admin Pass", type="password") == admin_pass:
+        if st.text_input("Admin Pass", type="password") == st.secrets.get("ADMIN_PASS", "admin"):
             st.dataframe(load_logs())
-            
-    with st.expander("🐞 Report Bug"):
-        with st.form("bug"):
-            if st.form_submit_button("Submit"): log_bug("User", "Issue Reported", "Med")
 
-# --- CHAT LOGIC ---
-st.title(f"✍️ {selected_name}")
-wizard = PolyglotWizard(client, current_config["fields"])
+# --- STATE MANAGEMENT ---
+current_config = FORM_LIBRARY[selected_name]
 fields = list(current_config["fields"].keys())
+wizard = PolyglotWizard(client, current_config["fields"])
 
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": wizard.generate_question(fields[0])}]
 if "form_data" not in st.session_state: st.session_state.form_data = {}
-if "idx" not in st.session_state: st.session_state.idx = 0
+if "idx" not in st.session_state: st.session_state.idx = -1  # -1 = Welcome Screen
+if "total_steps" not in st.session_state: st.session_state.total_steps = len(fields)
 
-# Display Chat History
-for msg in st.session_state.messages: st.chat_message(msg["role"]).write(msg["content"])
-
-# ONLY show chat input if we still have questions left
-if st.session_state.idx < len(fields):
-    if prompt := st.chat_input("Answer here..."):
-        # Save User Answer
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        st.chat_message("user").write(prompt)
-        
-        curr_field = fields[st.session_state.idx]
-        st.session_state.form_data[curr_field] = prompt 
-        
-        # Move to Next Question
-        st.session_state.idx += 1
-        
-        # If there are more questions, generate the next one
-        if st.session_state.idx < len(fields):
-            q = wizard.generate_question(fields[st.session_state.idx])
-            st.session_state.messages.append({"role": "assistant", "content": q})
-            st.rerun()
-        else:
-            # We are done! Refresh to hide chat and show Identity section
-            st.rerun()
-
-# --- FINALIZATION (IDENTITY) ---
-# This section only appears when index >= len(fields)
-if st.session_state.idx >= len(fields):
-    st.divider()
+# ==========================================
+# STAGE 0: WELCOME SCREEN
+# ==========================================
+if st.session_state.idx == -1:
+    st.title(f"👋 Welcome to {selected_name}")
+    st.info("You are about to begin a secure legal intake process.")
     
-    # --- NEW: REVIEW SECTION ---
-    st.header("📋 Review Your Answers")
-    st.info("Please check for spelling errors before submitting.")
-    # Display the answers clearly so the user can verify them
+    st.markdown("""
+    ### 📝 What to Expect:
+    1. **Answer a few simple questions** regarding your case.
+    2. **Verify your Identity** with a selfie and photo ID.
+    3. **Review your answers** for accuracy.
+    4. **Sign digitally** to submit your file directly to Justin White.
+    
+    *This process is encrypted and secure.*
+    """)
+    
+    if st.button("🚀 Start Intake"):
+        st.session_state.idx = 0
+        st.rerun()
+
+# ==========================================
+# STAGE 1: QUESTIONS (One at a time)
+# ==========================================
+elif st.session_state.idx < len(fields):
+    curr_field = fields[st.session_state.idx]
+    
+    # Generate the AI question (or use cached one)
+    if f"q_{st.session_state.idx}" not in st.session_state:
+        q_text = wizard.generate_question(curr_field)
+        st.session_state[f"q_{st.session_state.idx}"] = q_text
+    else:
+        q_text = st.session_state[f"q_{st.session_state.idx}"]
+
+    # UI
+    st.title("Question " + str(st.session_state.idx + 1))
+    st.markdown(f"### 🤖 {q_text}")
+    
+    # Form Input
+    with st.form(key=f"form_{st.session_state.idx}"):
+        answer = st.text_input("Your Answer:", key=f"input_{st.session_state.idx}")
+        
+        c1, c2 = st.columns([1, 5])
+        submitted = c1.form_submit_button("Next ➡️")
+        
+        if submitted and answer:
+            st.session_state.form_data[curr_field] = answer
+            st.session_state.idx += 1
+            st.rerun()
+        elif submitted and not answer:
+            st.warning("Please provide an answer to continue.")
+
+# ==========================================
+# STAGE 2: BIOMETRICS
+# ==========================================
+elif st.session_state.idx == len(fields):
+    st.title("🆔 Identity Verification")
+    st.info("Please provide the following to verify your identity.")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("**1. Take a Selfie**")
+        selfie = st.camera_input("Selfie")
+    with c2:
+        st.markdown("**2. Upload Gov ID**")
+        gov_id = st.file_uploader("Upload ID", type=['jpg', 'png', 'jpeg'])
+    
+    if selfie and gov_id:
+        st.session_state.temp_selfie = selfie
+        st.session_state.temp_id = gov_id
+        if st.button("Continue to Review ➡️"):
+            st.session_state.idx += 1
+            st.rerun()
+
+# ==========================================
+# STAGE 3: REVIEW ANSWERS
+# ==========================================
+elif st.session_state.idx == len(fields) + 1:
+    st.title("📋 Review Your Info")
+    st.write("Please verify that all information below is correct.")
+    
     for key, value in st.session_state.form_data.items():
-        # Get a readable label from the config
         label = current_config["fields"][key]["description"]
         st.text_input(label, value=value, disabled=True)
-    st.divider()
-    # ---------------------------
-
-    st.header("🆔 Identity Verification")
+        
     c1, c2 = st.columns(2)
-    selfie = c1.camera_input("Selfie")
-    gov_id = c2.file_uploader("ID", type=['jpg','png'])
-    
-    st.write("Sign Below:")
-    sig = st_canvas(stroke_width=2, height=150, key="sig")
-    
-    # TWILIO CONSENT LINE
-    st.caption("By clicking Submit, I agree to receive SMS updates about my case.")
+    if c1.button("✏️ Revise Answers"):
+        # Reset to start if they need to change something
+        st.session_state.idx = 0 
+        st.rerun()
+        
+    if c2.button("✅ Information is Correct"):
+        st.session_state.idx += 1
+        st.rerun()
 
-    if st.button("Finalize & Submit"):
-        if selfie and gov_id and sig.image_data is not None:
-            with st.spinner("Processing with FormFlux..."):
+# ==========================================
+# STAGE 4: SIGN & SUBMIT
+# ==========================================
+elif st.session_state.idx == len(fields) + 2:
+    st.title("✍️ Final Signature")
+    st.write("By signing below, you attest that the information provided is true.")
+    
+    sig = st_canvas(stroke_width=2, height=150, key="sig")
+    st.caption("By clicking Submit, I agree to receive SMS updates about my case.")
+    
+    if st.button("🚀 Finalize & Submit Case"):
+        if sig.image_data is not None:
+            with st.spinner("Encrypting and submitting..."):
                 # Save Assets
-                with open("temp_selfie.jpg","wb") as f: f.write(selfie.getbuffer())
-                with open("temp_id.jpg","wb") as f: f.write(gov_id.getbuffer())
+                with open("temp_selfie.jpg","wb") as f: f.write(st.session_state.temp_selfie.getbuffer())
+                with open("temp_id.jpg","wb") as f: f.write(st.session_state.temp_id.getbuffer())
                 Image.fromarray(sig.image_data.astype('uint8'),'RGBA').save("temp_sig.png")
                 
-                # Create PDF
+                # Generate PDF
                 stamper = IdentityStamper(current_config['filename'])
                 final_pdf = stamper.compile_final_doc(st.session_state.form_data, "temp_sig.png", "temp_selfie.jpg", "temp_id.jpg")
                 
-                # Dispatch Email
+                # Email
                 client_name = st.session_state.form_data.get("txt_FirstName", "Client")
                 target_email = current_config.get("recipient_email", "admin@example.com")
-                
-                email_status = send_secure_email(final_pdf, client_name, target_email)
+                send_secure_email(final_pdf, client_name, target_email)
                 log_submission(client_name, selected_name, "Success")
                 
-                # --- TWILIO DEBUGGER ---
+                # SMS
                 phone = st.secrets.get("LAWYER_PHONE_NUMBER")
                 if phone: 
-                    sms_success, sms_msg = send_sms_alert(client_name, selected_name, phone)
-                    if sms_success:
-                        st.toast(f"📱 SMS Sent to {phone}!")
-                    else:
-                        st.error(f"❌ SMS Failed: {sms_msg}")
-                else:
-                    st.warning("⚠️ No Lawyer Phone Number found in Secrets.")
+                    try:
+                        send_sms_alert(client_name, selected_name, phone)
+                        st.toast("SMS Alert Sent")
+                    except:
+                        pass # Ignore SMS failures for user experience
                 
-                st.success("✅ Submission Sent via FormFlux!")
+                st.success("✅ Case Filed Successfully!")
                 st.balloons()
