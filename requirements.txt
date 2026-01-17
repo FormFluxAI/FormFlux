@@ -1,0 +1,11 @@
+streamlit
+openai
+pypdf
+reportlab
+streamlit-drawable-canvas
+twilio
+Pillow
+numpy
+pandas
+watchdog
+
