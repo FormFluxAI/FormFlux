@@ -8,6 +8,7 @@ from dispatcher import send_secure_email
 from sms import send_sms_alert
 from logger import log_submission, load_logs
 from bugs import log_bug
+from streamlit_drawable_canvas import st_canvas
 
 st.set_page_config(page_title="FormFlux | Justin White", page_icon="🌊")
 
@@ -46,68 +47,6 @@ with st.sidebar:
     current_config = FORM_LIBRARY[selected_name]
     
     with st.expander("💼 Admin Dashboard"):
-        if st.text_input("Admin Pass", type="password") == st.secrets.get("ADMIN_PASS", "admin"):
-            st.dataframe(load_logs())
-    with st.expander("🐞 Report Bug"):
-        with st.form("bug"):
-            if st.form_submit_button("Submit"): log_bug("User", "Issue Reported", "Med")
-
-# --- CHAT ---
-st.title(f"✍️ {selected_name}")
-wizard = PolyglotWizard(client, current_config["fields"])
-fields = list(current_config["fields"].keys())
-
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": wizard.generate_question(fields[0])}]
-if "form_data" not in st.session_state: st.session_state.form_data = {}
-if "idx" not in st.session_state: st.session_state.idx = 0
-
-for msg in st.session_state.messages: st.chat_message(msg["role"]).write(msg["content"])
-
-if prompt := st.chat_input("Answer here..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
-    curr_field = fields[st.session_state.idx]
-    st.session_state.form_data[curr_field] = prompt 
-    st.session_state.idx += 1
-    if st.session_state.idx < len(fields):
-        q = wizard.generate_question(fields[st.session_state.idx])
-        st.session_state.messages.append({"role": "assistant", "content": q})
-        st.rerun()
-    else:
-        st.rerun()
-
-# --- FINALIZATION ---
-    if st.button("Finalize & Submit"):
-        if selfie and gov_id and sig.image_data is not None:
-            with st.spinner("Processing with FormFlux..."):
-                # Save Assets
-                with open("temp_selfie.jpg","wb") as f: f.write(selfie.getbuffer())
-                with open("temp_id.jpg","wb") as f: f.write(gov_id.getbuffer())
-                Image.fromarray(sig.image_data.astype('uint8'),'RGBA').save("temp_sig.png")
-                
-                # Create PDF
-                stamper = IdentityStamper(current_config['filename'])
-                final_pdf = stamper.compile_final_doc(st.session_state.form_data, "temp_sig.png", "temp_selfie.jpg", "temp_id.jpg")
-                
-                # Dispatch
-                client_name = st.session_state.form_data.get("txt_FirstName", "Client")
-                target_email = current_config.get("recipient_email", "admin@example.com")
-                
-                email_status = send_secure_email(final_pdf, client_name, target_email)
-                log_submission(client_name, selected_name, "Success")
-                
-                # --- TWILIO DEBUGGER ---
-                phone = st.secrets.get("LAWYER_PHONE_NUMBER")
-                if phone: 
-                    sms_success, sms_msg = send_sms_alert(client_name, selected_name, phone)
-                    if sms_success:
-                        st.toast(f"📱 SMS Sent to {phone}!")
-                    else:
-                        st.error(f"❌ SMS Failed: {sms_msg}")
-                else:
-                    st.warning("⚠️ No Lawyer Phone Number found in Secrets.")
-                
-                st.success("✅ Submission Sent via FormFlux!")
-                st.balloons()
+        if st.
+        st.balloons()
                                  
