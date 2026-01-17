@@ -4,6 +4,7 @@ from openai import OpenAI
 from pypdf import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
+from reportlab.lib.colors import lightgrey
 
 class PolyglotWizard:
     def __init__(self, client, field_config, user_language="English"):
@@ -12,7 +13,6 @@ class PolyglotWizard:
         self.language = user_language
 
     def generate_question(self, field_key):
-        # MOCK MODE CHECK
         if not self.client:
             field_info = self.field_config.get(field_key, {"description": field_key})
             return f"🤖 [MOCK AI] Please enter: {field_info['description']}"
@@ -55,10 +55,19 @@ class IdentityStamper:
         return output_filename
 
     def compile_final_doc(self, field_data, sig, selfie, gov_id, final_output="filed_case.pdf"):
-        # Auto-generate dummy PDF if missing (Critical for Cloud deployment)
+        # --- THE FIX: Create a PDF WITH BOXES if missing ---
         if not os.path.exists(self.original_pdf_path):
             c = canvas.Canvas(self.original_pdf_path, pagesize=letter)
-            c.drawString(100, 750, "MOCK FORM - AUTO GENERATED")
+            c.drawString(50, 750, "OFFICIAL FORMFLUX INTAKE")
+            
+            c.drawString(50, 700, "First Name:")
+            c.acroForm.textfield("txt_FirstName", x=150, y=690, width=200, height=20, fillColor=lightgrey)
+            
+            c.drawString(50, 650, "US Citizen:")
+            c.acroForm.checkbox("chk_Citizen", x=150, y=645, size=20, fillColor=lightgrey)
+            
+            c.drawString(50, 600, "Case Story:")
+            c.acroForm.textfield("txt_Story", x=50, y=500, width=400, height=90, fillColor=lightgrey)
             c.save()
 
         reader = PdfReader(self.original_pdf_path)
@@ -66,8 +75,8 @@ class IdentityStamper:
         writer.append_pages_from_reader(reader)
         try:
             writer.update_page_form_field_values(writer.pages[0], field_data)
-        except:
-            pass # Ignore field errors on mock pdf
+        except Exception as e:
+            print(f"Error filling PDF: {e}")
         
         id_page = self.create_identity_page(sig, selfie, gov_id)
         id_reader = PdfReader(id_page)
