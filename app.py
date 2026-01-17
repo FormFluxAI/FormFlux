@@ -12,7 +12,21 @@ from bugs import log_bug
 from streamlit_drawable_canvas import st_canvas
 
 # --- 🔗 IMPORT CLIENT SETTINGS ---
-import client_settings as cs 
+# If this import fails, ensure client_settings.py exists!
+try:
+    import client_settings as cs
+except ImportError:
+    # Fallback if file is missing
+    class cs:
+        APP_TITLE = "FormFlux"
+        PAGE_ICON = "🌊"
+        LOGIN_HEADER = "FormFlux Portal"
+        TAGLINE = "Fluid Forms for a Flexible World"
+        CLIENT_NAME = "FormFlux"
+        ACCESS_CODES = ["TEST-JW"]
+        LAWYER_EMAIL = "admin@example.com"
+        FINAL_SIGNATURE_TEXT = "Sign below."
+        CONSENT_TEXT = "I agree to SMS updates."
 
 st.set_page_config(page_title=cs.APP_TITLE, page_icon=cs.PAGE_ICON)
 
@@ -23,7 +37,6 @@ if not st.session_state.authenticated:
     st.caption(cs.TAGLINE)
     code = st.text_input("Access Code", type="password")
     if st.button("Enter"):
-        # Check against the list in client_settings
         if code in cs.ACCESS_CODES:
             st.session_state.authenticated = True
             st.rerun()
@@ -175,14 +188,38 @@ elif st.session_state.idx == len(fields) + 2:
                 with open("temp_id.jpg","wb") as f: f.write(st.session_state.temp_id.getbuffer())
                 Image.fromarray(sig.image_data.astype('uint8'),'RGBA').save("temp_sig.png")
                 
-                # 2. Generate PDF
-                stamper = IdentityStamper(current_config['filename'])
-                final_pdf = stamper.compile_final_doc(st.session_state.form_data, "temp_sig.png", "temp_selfie.jpg", "temp_id.jpg")
+                # 2. GENERATE PDF (Smart Logic: Bundle vs Single)
+                final_output = None
                 
-                # 3. Email (Uses Config Email)
+                # Check if it is a BUNDLE (list of files) or SINGLE (one filename)
+                if current_config.get("is_bundle"):
+                    # Bundle Logic
+                    stamper = IdentityStamper() # Initialize without a specific path
+                    final_output = stamper.compile_bundle(
+                        current_config['files'], 
+                        st.session_state.form_data, 
+                        "temp_sig.png", 
+                        "temp_selfie.jpg", 
+                        "temp_id.jpg"
+                    )
+                else:
+                    # Single File Logic
+                    # Fallback to 'default.pdf' if filename is missing to prevent crashes
+                    target_file = current_config.get('filename', 'default.pdf')
+                    stamper = IdentityStamper(target_file)
+                    final_output = stamper.compile_final_doc(
+                        st.session_state.form_data, 
+                        "temp_sig.png", 
+                        "temp_selfie.jpg", 
+                        "temp_id.jpg"
+                    )
+                
+                # 3. Email
                 client_name = st.session_state.form_data.get("txt_FirstName", "Client")
-                target_email = cs.LAWYER_EMAIL # <--- Pulls from client_settings
-                send_secure_email(final_pdf, client_name, target_email)
+                # Use email from config if specific, otherwise use Client Settings
+                target_email = current_config.get("recipient_email", cs.LAWYER_EMAIL)
+                
+                send_secure_email(final_output, client_name, target_email)
                 log_submission(client_name, selected_name, "Success")
                 
                 # 4. SMS
