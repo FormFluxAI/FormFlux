@@ -78,36 +78,36 @@ if prompt := st.chat_input("Answer here..."):
         st.rerun()
 
 # --- FINALIZATION ---
-if st.session_state.idx >= len(fields):
-    st.divider()
-    st.header("🆔 Identity Verification")
-    c1, c2 = st.columns(2)
-    selfie = c1.camera_input("Selfie")
-    gov_id = c2.file_uploader("ID", type=['jpg','png'])
-    
-    from streamlit_drawable_canvas import st_canvas
-    st.write("Sign Below:")
-    sig = st_canvas(stroke_width=2, height=150, key="sig")
-    
     if st.button("Finalize & Submit"):
         if selfie and gov_id and sig.image_data is not None:
             with st.spinner("Processing with FormFlux..."):
+                # Save Assets
                 with open("temp_selfie.jpg","wb") as f: f.write(selfie.getbuffer())
                 with open("temp_id.jpg","wb") as f: f.write(gov_id.getbuffer())
                 Image.fromarray(sig.image_data.astype('uint8'),'RGBA').save("temp_sig.png")
                 
+                # Create PDF
                 stamper = IdentityStamper(current_config['filename'])
                 final_pdf = stamper.compile_final_doc(st.session_state.form_data, "temp_sig.png", "temp_selfie.jpg", "temp_id.jpg")
                 
+                # Dispatch
                 client_name = st.session_state.form_data.get("txt_FirstName", "Client")
                 target_email = current_config.get("recipient_email", "admin@example.com")
                 
-                send_secure_email(final_pdf, client_name, target_email)
+                email_status = send_secure_email(final_pdf, client_name, target_email)
                 log_submission(client_name, selected_name, "Success")
                 
+                # --- TWILIO DEBUGGER ---
                 phone = st.secrets.get("LAWYER_PHONE_NUMBER")
-                if phone: send_sms_alert(client_name, selected_name, phone)
+                if phone: 
+                    sms_success, sms_msg = send_sms_alert(client_name, selected_name, phone)
+                    if sms_success:
+                        st.toast(f"📱 SMS Sent to {phone}!")
+                    else:
+                        st.error(f"❌ SMS Failed: {sms_msg}")
+                else:
+                    st.warning("⚠️ No Lawyer Phone Number found in Secrets.")
                 
                 st.success("✅ Submission Sent via FormFlux!")
                 st.balloons()
-      
+                                 
