@@ -77,5 +77,4 @@ class IdentityStamper:
             writer.write(f)
         if os.path.exists(id_page): os.remove(id_page)
         return final_output
-"""
-
+        
