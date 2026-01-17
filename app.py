@@ -34,28 +34,38 @@ if api_key and api_key.startswith("sk-") and api_key != "mock":
     except:
         client = None
 
+# --- STATE INITIALIZATION ---
+# We do this early so the Sidebar can see the variables
+if "form_data" not in st.session_state: st.session_state.form_data = {}
+if "idx" not in st.session_state: st.session_state.idx = -1  # -1 = Welcome Screen
+selected_name_pre = list(FORM_LIBRARY.keys())[0] # Default
+
 # --- SIDEBAR ---
 with st.sidebar:
     st.header("FormFlux Intake")
     st.caption("Owner: Justin White")
     selected_name = st.selectbox("Select Document", list(FORM_LIBRARY.keys()))
     
-    # Progress Bar Logic
-    if "idx" in st.session_state and "total_steps" in st.session_state:
-        progress = st.session_state.idx / st.session_state.total_steps
-        st.progress(progress, text=f"Progress: {int(progress*100)}%")
+    # --- FIXED PROGRESS BAR LOGIC ---
+    if "total_steps" in st.session_state and st.session_state.total_steps > 0:
+        # 1. If on Welcome Screen (-1), treat as 0
+        safe_idx = max(0, st.session_state.idx)
+        # 2. If we went past the questions (Stages 2,3,4), cap it at 100%
+        safe_idx = min(safe_idx, st.session_state.total_steps)
+        
+        progress_value = safe_idx / st.session_state.total_steps
+        st.progress(progress_value, text=f"Progress: {int(progress_value*100)}%")
 
     with st.expander("💼 Admin Dashboard"):
         if st.text_input("Admin Pass", type="password") == st.secrets.get("ADMIN_PASS", "admin"):
             st.dataframe(load_logs())
 
-# --- STATE MANAGEMENT ---
+# --- MAIN LOGIC ---
 current_config = FORM_LIBRARY[selected_name]
 fields = list(current_config["fields"].keys())
 wizard = PolyglotWizard(client, current_config["fields"])
 
-if "form_data" not in st.session_state: st.session_state.form_data = {}
-if "idx" not in st.session_state: st.session_state.idx = -1  # -1 = Welcome Screen
+# Set Total Steps based on number of questions
 if "total_steps" not in st.session_state: st.session_state.total_steps = len(fields)
 
 # ==========================================
@@ -93,7 +103,7 @@ elif st.session_state.idx < len(fields):
         q_text = st.session_state[f"q_{st.session_state.idx}"]
 
     # UI
-    st.title("Question " + str(st.session_state.idx + 1))
+    st.title(f"Question {st.session_state.idx + 1} of {len(fields)}")
     st.markdown(f"### 🤖 {q_text}")
     
     # Form Input
