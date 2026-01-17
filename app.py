@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-import time  # <--- NEW: Added for the delay timer
+import time
 from PIL import Image
 from openai import OpenAI
 from backend import PolyglotWizard, IdentityStamper
@@ -11,16 +11,20 @@ from logger import log_submission, load_logs
 from bugs import log_bug
 from streamlit_drawable_canvas import st_canvas
 
-st.set_page_config(page_title="FormFlux | Justin White", page_icon="🌊")
+# --- 🔗 IMPORT CLIENT SETTINGS ---
+import client_settings as cs 
+
+st.set_page_config(page_title=cs.APP_TITLE, page_icon=cs.PAGE_ICON)
 
 # --- LOGIN GATE ---
 if "authenticated" not in st.session_state: st.session_state.authenticated = False
 if not st.session_state.authenticated:
-    st.title("🔒 FormFlux Portal")
-    st.caption("Fluid Forms for a Flexible World")
+    st.title(f"🔒 {cs.LOGIN_HEADER}")
+    st.caption(cs.TAGLINE)
     code = st.text_input("Access Code", type="password")
     if st.button("Enter"):
-        if code in ["JUSTIN-ADMIN", "WHITE-LEGAL", "TEST-JW"]:
+        # Check against the list in client_settings
+        if code in cs.ACCESS_CODES:
             st.session_state.authenticated = True
             st.rerun()
         else: st.error("Invalid Access Code")
@@ -37,13 +41,13 @@ if api_key and api_key.startswith("sk-") and api_key != "mock":
 
 # --- STATE INITIALIZATION ---
 if "form_data" not in st.session_state: st.session_state.form_data = {}
-if "idx" not in st.session_state: st.session_state.idx = -1  # -1 = Welcome Screen
+if "idx" not in st.session_state: st.session_state.idx = -1
 selected_name_pre = list(FORM_LIBRARY.keys())[0]
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.header("FormFlux Intake")
-    st.caption("Owner: Justin White")
+    st.header(cs.CLIENT_NAME)
+    st.caption(cs.TAGLINE)
     selected_name = st.selectbox("Select Document", list(FORM_LIBRARY.keys()))
     
     # Progress Bar
@@ -68,17 +72,15 @@ if "total_steps" not in st.session_state: st.session_state.total_steps = len(fie
 # STAGE 0: WELCOME SCREEN
 # ==========================================
 if st.session_state.idx == -1:
-    st.title(f"👋 Welcome to {selected_name}")
-    st.info("You are about to begin a secure legal intake process.")
+    st.title(f"👋 Welcome to {cs.CLIENT_NAME}")
+    st.info(f"You are about to begin a secure legal intake process for {cs.CLIENT_NAME}.")
     
     st.markdown("""
     ### 📝 What to Expect:
     1. **Answer a few simple questions** regarding your case.
     2. **Verify your Identity** with a selfie and photo ID.
     3. **Review your answers** for accuracy.
-    4. **Sign digitally** to submit your file directly to Justin White.
-    
-    *This process is encrypted and secure.*
+    4. **Sign digitally** to submit your file.
     """)
     
     if st.button("🚀 Start Intake"):
@@ -160,10 +162,10 @@ elif st.session_state.idx == len(fields) + 1:
 # ==========================================
 elif st.session_state.idx == len(fields) + 2:
     st.title("✍️ Final Signature")
-    st.write("By signing below, you attest that the information provided is true.")
+    st.write(cs.FINAL_SIGNATURE_TEXT)
     
     sig = st_canvas(stroke_width=2, height=150, key="sig")
-    st.caption("By clicking Submit, I agree to receive SMS updates about my case.")
+    st.caption(cs.CONSENT_TEXT)
     
     if st.button("🚀 Finalize & Submit Case"):
         if sig.image_data is not None:
@@ -177,13 +179,13 @@ elif st.session_state.idx == len(fields) + 2:
                 stamper = IdentityStamper(current_config['filename'])
                 final_pdf = stamper.compile_final_doc(st.session_state.form_data, "temp_sig.png", "temp_selfie.jpg", "temp_id.jpg")
                 
-                # 3. Email
+                # 3. Email (Uses Config Email)
                 client_name = st.session_state.form_data.get("txt_FirstName", "Client")
-                target_email = current_config.get("recipient_email", "admin@example.com")
+                target_email = cs.LAWYER_EMAIL # <--- Pulls from client_settings
                 send_secure_email(final_pdf, client_name, target_email)
                 log_submission(client_name, selected_name, "Success")
                 
-                # 4. SMS (Silent Fail)
+                # 4. SMS
                 phone = st.secrets.get("LAWYER_PHONE_NUMBER")
                 if phone: 
                     try:
@@ -194,6 +196,6 @@ elif st.session_state.idx == len(fields) + 2:
                 # 5. END SESSION LOGIC
                 st.balloons()
                 st.success("✅ Case Filed! This session will close in 5 seconds...")
-                time.sleep(5)  # Wait for user to read
-                st.session_state.clear()  # Wipe all data
-                st.rerun()  # Reboot to Login Screen
+                time.sleep(5)
+                st.session_state.clear()
+                st.rerun()
