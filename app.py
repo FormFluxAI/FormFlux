@@ -45,10 +45,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 🔄 STATE INITIALIZATION (MOVED TO TOP TO FIX ERROR) ---
+# --- 🔄 STATE INITIALIZATION ---
 if "user_mode" not in st.session_state: st.session_state.user_mode = "client"
 if "authenticated" not in st.session_state: st.session_state.authenticated = False
 if "language" not in st.session_state: st.session_state.language = "🇺🇸 English"
+if "high_contrast" not in st.session_state: st.session_state.high_contrast = False
+if "font_size" not in st.session_state: st.session_state.font_size = "Normal"
 if "terms_accepted" not in st.session_state: st.session_state.terms_accepted = False
 if "form_queue" not in st.session_state: st.session_state.form_queue = [] 
 if "current_form_index" not in st.session_state: st.session_state.current_form_index = 0
@@ -71,8 +73,24 @@ UI_LANG = {
         "next_form": "✅ Form Complete! Proceed to Next ➡️",
         "dashboard_btn": "ENTER DASHBOARD ➡️",
         "input_req": "⚠️ Required",
+        "reset": "🔄 RESET / LOGOUT"
     },
-    # (Other languages hidden for brevity)
+    "🇪🇸 Español": {
+        "welcome": "Bienvenido al Portal Seguro.",
+        "terms_header": "📜 Términos de Servicio",
+        "terms_body": "Al continuar, reconoce que FormFluxAI es un proveedor de tecnología, no un bufete de abogados.",
+        "agree_btn": "ACEPTO Y CONTINÚO ➡️",
+        "progress": "Su Progreso",
+        "upload_header": "📂 La Bóveda: Carga Segura",
+        "upload_desc": "Por favor cargue los documentos solicitados (Identificación, Pasaporte, etc.) a continuación.",
+        "sign_header": "✍️ Autorización Final",
+        "finish_btn": "✅ ENVIAR PAQUETE COMPLETO",
+        "next_form": "✅ ¡Formulario Completo! Siguiente ➡️",
+        "dashboard_btn": "ENTRAR AL PANEL ➡️",
+        "input_req": "⚠️ Requerido",
+        "reset": "🔄 REINICIAR"
+    },
+    # Add other languages as needed
 }
 
 # Helper Function
@@ -81,9 +99,22 @@ def t(key):
     return lang_dict.get(key, key)
 
 # --- 🎨 CSS ENGINE ---
-st.markdown("""
-<style>
-    /* GLOBAL THEME */
+font_css = ""
+if st.session_state.font_size == "Large":
+    font_css = "html, body, [class*='css'] { font-size: 20px !important; }"
+elif st.session_state.font_size == "Extra Large":
+    font_css = "html, body, [class*='css'] { font-size: 24px !important; }"
+
+if st.session_state.high_contrast:
+    theme_css = """
+    .stApp { background-color: #ffffff !important; color: #000000 !important; }
+    div.block-container { background: #ffffff; border: 3px solid #000000; color: black; border-radius: 0px; }
+    .stButton>button { background: #000000 !important; color: #ffff00 !important; border: 3px solid #000000; border-radius: 0px; font-weight: 900; }
+    .stTextInput>div>div>input { background-color: #ffffff; color: black; border: 2px solid black; }
+    h1, h2, h3, h4, p, span, div, label { color: #000000 !important; font-family: Arial, sans-serif !important; }
+    """
+else:
+    theme_css = """
     .stApp {
         background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1f4068);
         background-size: 400% 400%;
@@ -97,9 +128,16 @@ st.markdown("""
     label, .stRadio, .stCheckbox, p, h1, h2, h3 { color: white !important; }
     button { border: 1px solid #00d4ff !important; color: #00d4ff !important; background: transparent !important; }
     button:hover { background: #00d4ff !important; color: black !important; }
+    """
+
+# INJECT CSS WITH "PRESS ENTER" FIX
+st.markdown(f"""
+<style>
+    {theme_css} 
+    {font_css}
     
     /* LINK DISPLAY BOX */
-    .link-box {
+    .link-box {{
         background-color: #222;
         padding: 15px;
         border: 1px dashed #00d4ff;
@@ -107,7 +145,12 @@ st.markdown("""
         font-family: monospace;
         color: #00d4ff;
         word-break: break-all;
-    }
+    }}
+    
+    /* HIDE 'PRESS ENTER TO APPLY' TEXT */
+    div[data-testid="InputInstructions"] {{
+        display: none !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -128,10 +171,24 @@ if magic_code:
 
 # --- 🛡️ SIDEBAR ---
 with st.sidebar:
-    if st.button("🔄 RESET / LOGOUT", type="primary"):
+    # 1. ACCESSIBILITY RESTORED
+    with st.expander("👁️ Display & Language"):
+        st.session_state.language = st.selectbox("Language", list(UI_LANG.keys()))
+        st.divider()
+        st.session_state.high_contrast = st.toggle("High Contrast Mode", value=st.session_state.high_contrast)
+        st.session_state.font_size = st.select_slider("Text Size", options=["Normal", "Large", "Extra Large"])
+        if st.button("Apply Settings"): st.rerun()
+    
+    st.divider()
+
+    # 2. RESET BUTTON
+    if st.button(t("reset"), type="primary"):
         st.session_state.clear()
         st.rerun()
+    
     st.divider()
+    
+    # 3. FIRM LOGIN
     st.title("⚖️ Firm Login")
     admin_pass = st.text_input("Password", type="password", label_visibility="collapsed")
     if st.button("ENTER DASHBOARD ➡️"):
@@ -163,7 +220,6 @@ if st.session_state.user_mode == "lawyer":
                 
                 st.success(f"Packet Ready for {client_name} containing {len(selected_forms)} forms.")
                 st.markdown("### 🔗 Secure Link:")
-                # NEW: BETTER LINK DISPLAY
                 st.markdown(f'<div class="link-box">{magic_link}</div>', unsafe_allow_html=True)
                 st.caption("Copy the link above and send it to the client.")
 
@@ -272,7 +328,7 @@ else:
     client = get_openai_client(st.secrets.get("OPENAI_API_KEY"))
     current_config = FORM_LIBRARY.get(active_form_name, list(FORM_LIBRARY.values())[0])
     fields = list(current_config["fields"].keys())
-    wizard = PolyglotWizard(client, current_config["fields"], user_language="🇺🇸 English")
+    wizard = PolyglotWizard(client, current_config["fields"], user_language=st.session_state.language)
     
     if st.session_state.idx == -1:
         st.title(active_form_name)
