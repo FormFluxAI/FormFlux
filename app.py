@@ -12,35 +12,93 @@ from bugs import log_bug
 from streamlit_drawable_canvas import st_canvas
 
 # --- 🔗 IMPORT CLIENT SETTINGS ---
-# If this import fails, ensure client_settings.py exists!
 try:
     import client_settings as cs
 except ImportError:
-    # Fallback if file is missing
     class cs:
         APP_TITLE = "FormFlux"
         PAGE_ICON = "🌊"
-        LOGIN_HEADER = "FormFlux Portal"
-        TAGLINE = "Fluid Forms for a Flexible World"
+        LOGIN_HEADER = "FormFlux"
+        TAGLINE = "Fluid Forms"
         CLIENT_NAME = "FormFlux"
-        ACCESS_CODES = ["TEST-JW"]
+        ACCESS_CODES = ["TEST"]
         LAWYER_EMAIL = "admin@example.com"
         FINAL_SIGNATURE_TEXT = "Sign below."
-        CONSENT_TEXT = "I agree to SMS updates."
+        CONSENT_TEXT = "I agree."
 
-st.set_page_config(page_title=cs.APP_TITLE, page_icon=cs.PAGE_ICON)
+st.set_page_config(page_title=cs.APP_TITLE, page_icon=cs.PAGE_ICON, layout="centered")
+
+# ==========================================
+# 🎨 UI OVERHAUL: THE "FLUX" THEME
+# ==========================================
+# This CSS hides the framework branding and makes it look like Custom Software.
+st.markdown("""
+<style>
+    /* 1. HIDE STREAMLIT BRANDING */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* 2. BACKGROUND & FONTS */
+    .stApp {
+        background-color: #f8f9fa; /* Light Grey Clean Background */
+    }
+    
+    /* 3. FLUID BUTTONS */
+    .stButton>button {
+        background: linear-gradient(45deg, #0077b6, #00b4d8);
+        color: white;
+        border: none;
+        border-radius: 25px;
+        padding: 10px 25px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+        color: white;
+    }
+
+    /* 4. CARD-LIKE CONTAINERS */
+    div.block-container {
+        background-color: white;
+        padding: 3rem;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        max-width: 800px;
+        margin-top: 2rem;
+    }
+    
+    /* 5. INPUT FIELDS */
+    .stTextInput>div>div>input {
+        border-radius: 10px;
+        border: 1px solid #e0e0e0;
+        padding: 10px;
+    }
+    
+    /* 6. PROGRESS BAR FLUX */
+    .stProgress > div > div > div > div {
+        background-image: linear-gradient(to right, #0077b6, #90e0ef);
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # --- LOGIN GATE ---
 if "authenticated" not in st.session_state: st.session_state.authenticated = False
 if not st.session_state.authenticated:
-    st.title(f"🔒 {cs.LOGIN_HEADER}")
-    st.caption(cs.TAGLINE)
-    code = st.text_input("Access Code", type="password")
-    if st.button("Enter"):
-        if code in cs.ACCESS_CODES:
-            st.session_state.authenticated = True
-            st.rerun()
-        else: st.error("Invalid Access Code")
+    c1, c2, c3 = st.columns([1,2,1])
+    with c2:
+        st.title(f"🌊 {cs.LOGIN_HEADER}")
+        st.caption(cs.TAGLINE)
+        st.divider()
+        code = st.text_input("Enter Access Code", type="password")
+        if st.button("Secure Login"):
+            if code in cs.ACCESS_CODES:
+                st.session_state.authenticated = True
+                st.rerun()
+            else: st.error("⛔ Access Denied")
     st.stop()
 
 # --- SAFETY SWITCH FOR OPENAI ---
@@ -57,21 +115,22 @@ if "form_data" not in st.session_state: st.session_state.form_data = {}
 if "idx" not in st.session_state: st.session_state.idx = -1
 selected_name_pre = list(FORM_LIBRARY.keys())[0]
 
-# --- SIDEBAR ---
+# --- SIDEBAR (Hidden Logic) ---
+# We keep the sidebar minimalist
 with st.sidebar:
-    st.header(cs.CLIENT_NAME)
-    st.caption(cs.TAGLINE)
-    selected_name = st.selectbox("Select Document", list(FORM_LIBRARY.keys()))
+    st.markdown("### ⚙️ Control Panel")
+    selected_name = st.selectbox("Current File", list(FORM_LIBRARY.keys()))
     
     # Progress Bar
     if "total_steps" in st.session_state and st.session_state.total_steps > 0:
         safe_idx = max(0, st.session_state.idx)
         safe_idx = min(safe_idx, st.session_state.total_steps)
         progress_value = safe_idx / st.session_state.total_steps
-        st.progress(progress_value, text=f"Progress: {int(progress_value*100)}%")
-
-    with st.expander("💼 Admin Dashboard"):
-        if st.text_input("Admin Pass", type="password") == st.secrets.get("ADMIN_PASS", "admin"):
+        st.progress(progress_value, text=f"{int(progress_value*100)}% Complete")
+    
+    st.divider()
+    with st.expander("🔐 Admin Only"):
+        if st.text_input("Admin Password", type="password") == st.secrets.get("ADMIN_PASS", "admin"):
             st.dataframe(load_logs())
 
 # --- MAIN LOGIC ---
@@ -85,18 +144,17 @@ if "total_steps" not in st.session_state: st.session_state.total_steps = len(fie
 # STAGE 0: WELCOME SCREEN
 # ==========================================
 if st.session_state.idx == -1:
-    st.title(f"👋 Welcome to {cs.CLIENT_NAME}")
-    st.info(f"You are about to begin a secure legal intake process for {cs.CLIENT_NAME}.")
+    st.image("https://img.icons8.com/clouds/200/overview-pages-3.png", width=150) # Placeholder Flux Icon
+    st.title(cs.CLIENT_NAME)
+    st.markdown(f"#### {cs.TAGLINE}")
+    st.info("Secure Intake Portal • 256-bit Encrypted Session")
     
     st.markdown("""
-    ### 📝 What to Expect:
-    1. **Answer a few simple questions** regarding your case.
-    2. **Verify your Identity** with a selfie and photo ID.
-    3. **Review your answers** for accuracy.
-    4. **Sign digitally** to submit your file.
+    **Start your intake process below.** * Please have your ID ready.
+    * This session will time out if left inactive.
     """)
     
-    if st.button("🚀 Start Intake"):
+    if st.button("🚀 Begin Secure Session"):
         st.session_state.idx = 0
         st.rerun()
 
@@ -112,40 +170,41 @@ elif st.session_state.idx < len(fields):
     else:
         q_text = st.session_state[f"q_{st.session_state.idx}"]
 
-    st.title(f"Question {st.session_state.idx + 1} of {len(fields)}")
-    st.markdown(f"### 🤖 {q_text}")
+    # UI: Clean Question Header
+    st.caption(f"Step {st.session_state.idx + 1} of {len(fields)}")
+    st.markdown(f"### {q_text}")
     
     with st.form(key=f"form_{st.session_state.idx}"):
-        answer = st.text_input("Your Answer:", key=f"input_{st.session_state.idx}")
+        answer = st.text_input("Type your answer here...", key=f"input_{st.session_state.idx}")
         
-        c1, c2 = st.columns([1, 5])
-        submitted = c1.form_submit_button("Next ➡️")
+        c1, c2 = st.columns([1, 4])
+        submitted = c1.form_submit_button("Next Step ➡️")
         
         if submitted and answer:
             st.session_state.form_data[curr_field] = answer
             st.session_state.idx += 1
             st.rerun()
         elif submitted and not answer:
-            st.warning("Please provide an answer to continue.")
+            st.toast("⚠️ Answer required to proceed.")
 
 # ==========================================
 # STAGE 2: BIOMETRICS
 # ==========================================
 elif st.session_state.idx == len(fields):
-    st.title("🆔 Identity Verification")
-    st.info("Please provide the following to verify your identity.")
+    st.title("🆔 Biometric Verification")
+    st.markdown("We need to verify your identity to prevent fraud.")
     
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("**1. Take a Selfie**")
-        selfie = st.camera_input("Selfie")
-    with c2:
-        st.markdown("**2. Upload Gov ID**")
-        gov_id = st.file_uploader("Upload ID", type=['jpg', 'png', 'jpeg'])
+    tab1, tab2 = st.tabs(["📸 Selfie", "💳 ID Card"])
+    
+    with tab1:
+        selfie = st.camera_input("Take a photo of yourself")
+    with tab2:
+        gov_id = st.file_uploader("Upload Government ID", type=['jpg', 'png', 'jpeg'])
     
     if selfie and gov_id:
         st.session_state.temp_selfie = selfie
         st.session_state.temp_id = gov_id
+        st.success("Verification Data Captured.")
         if st.button("Continue to Review ➡️"):
             st.session_state.idx += 1
             st.rerun()
@@ -154,19 +213,20 @@ elif st.session_state.idx == len(fields):
 # STAGE 3: REVIEW ANSWERS
 # ==========================================
 elif st.session_state.idx == len(fields) + 1:
-    st.title("📋 Review Your Info")
-    st.write("Please verify that all information below is correct.")
+    st.title("📋 Final Review")
+    st.markdown("Please confirm the details below.")
     
-    for key, value in st.session_state.form_data.items():
-        label = current_config["fields"][key]["description"]
-        st.text_input(label, value=value, disabled=True)
+    with st.container():
+        for key, value in st.session_state.form_data.items():
+            label = current_config["fields"][key]["description"]
+            st.text_input(label, value=value, disabled=True)
         
     c1, c2 = st.columns(2)
-    if c1.button("✏️ Revise Answers"):
+    if c1.button("✏️ Edit Answers"):
         st.session_state.idx = 0 
         st.rerun()
         
-    if c2.button("✅ Information is Correct"):
+    if c2.button("✅ Confirm & Continue"):
         st.session_state.idx += 1
         st.rerun()
 
@@ -174,65 +234,56 @@ elif st.session_state.idx == len(fields) + 1:
 # STAGE 4: SIGN & SUBMIT
 # ==========================================
 elif st.session_state.idx == len(fields) + 2:
-    st.title("✍️ Final Signature")
-    st.write(cs.FINAL_SIGNATURE_TEXT)
+    st.title("✍️ Digital Signature")
+    st.markdown(f"*{cs.FINAL_SIGNATURE_TEXT}*")
     
+    # Canvas with a border for better UX
+    st.markdown('<div style="border: 2px dashed #ccc; border-radius: 10px;">', unsafe_allow_html=True)
     sig = st_canvas(stroke_width=2, height=150, key="sig")
-    st.caption(cs.CONSENT_TEXT)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.caption(f"🔒 {cs.CONSENT_TEXT}")
     
     if st.button("🚀 Finalize & Submit Case"):
         if sig.image_data is not None:
-            with st.spinner("Encrypting and submitting..."):
+            with st.spinner("Encrypting, Stamping, and Transmitting..."):
                 # 1. Save Assets
                 with open("temp_selfie.jpg","wb") as f: f.write(st.session_state.temp_selfie.getbuffer())
                 with open("temp_id.jpg","wb") as f: f.write(st.session_state.temp_id.getbuffer())
                 Image.fromarray(sig.image_data.astype('uint8'),'RGBA').save("temp_sig.png")
                 
-                # 2. GENERATE PDF (Smart Logic: Bundle vs Single)
+                # 2. GENERATE PDF (Bundle vs Single)
                 final_output = None
-                
-                # Check if it is a BUNDLE (list of files) or SINGLE (one filename)
                 if current_config.get("is_bundle"):
-                    # Bundle Logic
-                    stamper = IdentityStamper() # Initialize without a specific path
+                    stamper = IdentityStamper() 
                     final_output = stamper.compile_bundle(
                         current_config['files'], 
                         st.session_state.form_data, 
-                        "temp_sig.png", 
-                        "temp_selfie.jpg", 
-                        "temp_id.jpg"
+                        "temp_sig.png", "temp_selfie.jpg", "temp_id.jpg"
                     )
                 else:
-                    # Single File Logic
-                    # Fallback to 'default.pdf' if filename is missing to prevent crashes
                     target_file = current_config.get('filename', 'default.pdf')
                     stamper = IdentityStamper(target_file)
                     final_output = stamper.compile_final_doc(
                         st.session_state.form_data, 
-                        "temp_sig.png", 
-                        "temp_selfie.jpg", 
-                        "temp_id.jpg"
+                        "temp_sig.png", "temp_selfie.jpg", "temp_id.jpg"
                     )
                 
                 # 3. Email
                 client_name = st.session_state.form_data.get("txt_FirstName", "Client")
-                # Use email from config if specific, otherwise use Client Settings
                 target_email = current_config.get("recipient_email", cs.LAWYER_EMAIL)
-                
                 send_secure_email(final_output, client_name, target_email)
                 log_submission(client_name, selected_name, "Success")
                 
                 # 4. SMS
                 phone = st.secrets.get("LAWYER_PHONE_NUMBER")
                 if phone: 
-                    try:
-                        send_sms_alert(client_name, selected_name, phone)
-                    except:
-                        pass
+                    try: send_sms_alert(client_name, selected_name, phone)
+                    except: pass
                 
-                # 5. END SESSION LOGIC
+                # 5. SUCCESS STATE
                 st.balloons()
-                st.success("✅ Case Filed! This session will close in 5 seconds...")
+                st.success("✅ Case Filed Successfully!")
                 time.sleep(5)
                 st.session_state.clear()
                 st.rerun()
