@@ -35,12 +35,11 @@ except ImportError:
 
 st.set_page_config(page_title=cs.APP_TITLE, page_icon=cs.PAGE_ICON, layout="centered")
 
-# --- 🎨 SESSION STATE FOR THEME ---
+# --- 🎨 SESSION STATE ---
 if "high_contrast" not in st.session_state: st.session_state.high_contrast = False
 if "font_size" not in st.session_state: st.session_state.font_size = "Normal"
 
 # --- 🎨 DYNAMIC CSS ENGINE ---
-# This runs EVERY time the app loads to check the user's preference
 font_css = ""
 if st.session_state.font_size == "Large":
     font_css = "html, body, [class*='css'] { font-size: 20px !important; }"
@@ -48,17 +47,16 @@ elif st.session_state.font_size == "Extra Large":
     font_css = "html, body, [class*='css'] { font-size: 24px !important; }"
 
 if st.session_state.high_contrast:
-    # ⚪ HIGH CONTRAST (Accessibility Mode)
+    # ⚪ HIGH CONTRAST
     theme_css = """
     .stApp { background-color: #ffffff !important; }
     div.block-container { background: #ffffff; border: 3px solid #000000; box-shadow: none; color: black; border-radius: 0px; }
     .stButton>button { background: #000000 !important; color: #ffff00 !important; border: 3px solid #000000; border-radius: 0px; font-weight: 900; }
-    .stButton>button:hover { background: #ffff00 !important; color: #000000 !important; }
     .stTextInput>div>div>input { background-color: #ffffff; color: black; border: 2px solid black; border-radius: 0px; }
     h1, h2, h3, h4, p, span, div, label { color: #000000 !important; font-family: Arial, sans-serif !important; }
     """
 else:
-    # 🌑 MIDNIGHT FLUX (Default Mode)
+    # 🌑 MIDNIGHT FLUX
     theme_css = """
     @keyframes gradient { 0% {background-position: 0% 50%;} 50% {background-position: 100% 50%;} 100% {background-position: 0% 50%;} }
     .stApp { background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1f4068); background-size: 400% 400%; animation: gradient 15s ease infinite; color: white; }
@@ -67,9 +65,13 @@ else:
     .stButton>button:hover { background: #00d4ff; color: #0f2027; box-shadow: 0 0 20px rgba(0, 212, 255, 0.6); transform: scale(1.05); }
     .stTextInput>div>div>input { background-color: rgba(0, 0, 0, 0.3); color: white; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; }
     h1, h2, h3, h4, p, span, div, label { color: white !important; font-family: 'Helvetica Neue', sans-serif; }
+    
+    /* FIX: HIDE "PRESS ENTER TO APPLY" OVERLAY */
+    div[data-testid="InputInstructions"] > span:nth-child(1) {
+        display: none;
+    }
     """
 
-# Inject CSS
 st.markdown(f"<style>{theme_css} {font_css} #MainMenu {{visibility: hidden;}} footer {{visibility: hidden;}} header {{visibility: hidden;}}</style>", unsafe_allow_html=True)
 
 # --- LOGIN GATE ---
@@ -80,16 +82,12 @@ if not st.session_state.authenticated:
         st.markdown(f"<h1 style='text-align: center;'>🌊 {cs.LOGIN_HEADER}</h1>", unsafe_allow_html=True)
         st.markdown(f"<p style='text-align: center; opacity: 0.8;'>{cs.TAGLINE}</p>", unsafe_allow_html=True)
         st.divider()
-        
-        # LOGIN INPUTS
         code = st.text_input("Enter Access Code", type="password")
         
-        # ♿ ACCESSIBILITY CONTROLS (Moved here!)
-        with st.expander("👁️ Display Settings (Accessibility)"):
+        with st.expander("👁️ Display Settings"):
             st.session_state.high_contrast = st.toggle("High Contrast Mode", value=st.session_state.high_contrast)
             st.session_state.font_size = st.select_slider("Text Size", options=["Normal", "Large", "Extra Large"])
-            if st.button("Apply Settings"):
-                st.rerun()
+            if st.button("Apply Settings"): st.rerun()
 
         if st.button("AUTHENTICATE"):
             if code in cs.ACCESS_CODES:
@@ -101,7 +99,7 @@ if not st.session_state.authenticated:
 # --- INITIALIZE BRAIN ---
 client = get_openai_client(st.secrets.get("OPENAI_API_KEY"))
 
-# --- STATE INITIALIZATION ---
+# --- STATE ---
 if "form_data" not in st.session_state: st.session_state.form_data = {}
 if "idx" not in st.session_state: st.session_state.idx = -1
 selected_name_pre = list(FORM_LIBRARY.keys())[0]
@@ -121,14 +119,14 @@ with st.sidebar:
         if st.text_input("Admin Password", type="password") == st.secrets.get("ADMIN_PASS", "admin"):
             st.dataframe(load_logs())
 
-# --- MAIN LOGIC ---
+# --- LOGIC ---
 current_config = FORM_LIBRARY[selected_name]
 fields = list(current_config["fields"].keys())
 wizard = PolyglotWizard(client, current_config["fields"])
 if "total_steps" not in st.session_state: st.session_state.total_steps = len(fields)
 
 # ==========================================
-# STAGE 0: WELCOME SCREEN
+# STAGE 0: WELCOME & LEGAL CHECK (CYA)
 # ==========================================
 if st.session_state.idx == -1:
     st.markdown(f"<h1 style='text-align: center;'>{cs.CLIENT_NAME}</h1>", unsafe_allow_html=True)
@@ -142,14 +140,22 @@ if st.session_state.idx == -1:
     </div>
     """, unsafe_allow_html=True)
     
+    # CYA: TERMS OF SERVICE
+    st.warning("⚠️ **LEGAL DISCLAIMER:** This software is an intake tool, not a lawyer. We do not provide legal advice. By proceeding, you agree that your responses will be used to generate draft documents for attorney review.")
+    
+    agree = st.checkbox("I have read and agree to the Terms of Service.")
+
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
         if st.button("INITIALIZE INTAKE"):
-            st.session_state.idx = 0
-            st.rerun()
+            if agree:
+                st.session_state.idx = 0
+                st.rerun()
+            else:
+                st.error("You must agree to the Terms to proceed.")
 
 # ==========================================
-# STAGE 1: QUESTIONS
+# STAGE 1: QUESTIONS (With Back Button)
 # ==========================================
 elif st.session_state.idx < len(fields):
     curr_field = fields[st.session_state.idx]
@@ -165,17 +171,31 @@ elif st.session_state.idx < len(fields):
     st.markdown(f"### {q_text}")
     
     with st.form(key=f"form_{st.session_state.idx}"):
-        answer = st.text_input("INPUT RESPONSE", key=f"input_{st.session_state.idx}")
+        # Pre-fill with existing answer if they went back
+        existing_val = st.session_state.form_data.get(curr_field, "")
+        answer = st.text_input("INPUT RESPONSE", value=existing_val, key=f"input_{st.session_state.idx}")
         
+        # Helper text instead of the default overlay
+        st.caption("Press 'Next' to continue.")
+
+        # NAV BUTTONS
         c1, c2 = st.columns([1, 1])
-        submitted = c1.form_submit_button("NEXT STEP >")
         
-        if submitted and answer:
-            st.session_state.form_data[curr_field] = answer
-            st.session_state.idx += 1
+        # Logic for Back/Next
+        go_back = c1.form_submit_button("⬅️ PREVIOUS")
+        go_next = c2.form_submit_button("NEXT STEP ➡️")
+        
+        if go_back:
+            st.session_state.idx = max(0, st.session_state.idx - 1)
             st.rerun()
-        elif submitted and not answer:
-            st.toast("⚠️ Input Required")
+            
+        if go_next:
+            if answer:
+                st.session_state.form_data[curr_field] = answer
+                st.session_state.idx += 1
+                st.rerun()
+            else:
+                st.toast("⚠️ Answer Required")
 
 # ==========================================
 # STAGE 2: BIOMETRICS
@@ -191,7 +211,12 @@ elif st.session_state.idx == len(fields):
         st.session_state.temp_selfie = selfie
         st.session_state.temp_id = gov_id
         st.success("✅ BIOMETRICS SECURED")
-        if st.button("PROCEED TO REVIEW >"):
+        
+        c1, c2 = st.columns(2)
+        if c1.button("⬅️ BACK"):
+            st.session_state.idx -= 1
+            st.rerun()
+        if c2.button("PROCEED TO REVIEW ➡️"):
             st.session_state.idx += 1
             st.rerun()
 
@@ -209,10 +234,16 @@ elif st.session_state.idx == len(fields) + 1:
     if c2.button("✅ CONFIRM"): st.session_state.idx += 1; st.rerun()
 
 # ==========================================
-# STAGE 4: SUBMIT
+# STAGE 4: SUBMIT (With Perjury Clause)
 # ==========================================
 elif st.session_state.idx == len(fields) + 2:
     st.markdown("### ✍️ FINAL AUTHORIZATION")
+    
+    # PERJURY PARAGRAPH (CYA)
+    st.info("""
+    **ATTESTATION:** By signing below, I certify under penalty of perjury that the information provided in this session is true, correct, and complete to the best of my knowledge. I understand that false statements may result in the rejection of my legal filing.
+    """)
+    
     border_color = "#000000" if st.session_state.high_contrast else "#00d4ff"
     st.markdown(f'<div style="border: 2px solid {border_color}; border-radius: 10px;">', unsafe_allow_html=True)
     sig = st_canvas(stroke_width=2, stroke_color="black" if st.session_state.high_contrast else "white", background_color="rgba(0,0,0,0)", height=150, key="sig")
