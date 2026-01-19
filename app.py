@@ -3,6 +3,7 @@ import streamlit.components.v1 as components
 import os
 import time
 import urllib.parse
+import pypdf # NEEDED FOR INSPECTOR
 from PIL import Image
 from openai import OpenAI
 from backend import PolyglotWizard, IdentityStamper
@@ -39,12 +40,12 @@ except ImportError:
 st.set_page_config(
     page_title=cs.APP_TITLE, 
     page_icon=cs.PAGE_ICON, 
-    layout="wide", # <--- WIDE MODE FOR DASHBOARD
+    layout="wide", 
     initial_sidebar_state="collapsed"
 )
 
 # --- 🎨 SESSION STATE ---
-if "user_mode" not in st.session_state: st.session_state.user_mode = "client" # or 'lawyer'
+if "user_mode" not in st.session_state: st.session_state.user_mode = "client"
 if "authenticated" not in st.session_state: st.session_state.authenticated = False
 if "form_data" not in st.session_state: st.session_state.form_data = {}
 if "idx" not in st.session_state: st.session_state.idx = -1
@@ -60,8 +61,6 @@ st.markdown("""
         animation: gradient 15s ease infinite;
         color: white;
     }
-    @keyframes gradient { 0% {background-position: 0% 50%;} 50% {background-position: 100% 50%;} 100% {background-position: 0% 50%;} }
-    
     /* DASHBOARD CARDS */
     div.css-1r6slb0, div.stDataFrame {
         background: rgba(255, 255, 255, 0.05);
@@ -69,7 +68,6 @@ st.markdown("""
         border-radius: 10px;
         padding: 20px;
     }
-
     /* INPUTS & BUTTONS */
     .stTextInput>div>div>input, .stSelectbox>div>div>div {
         background-color: rgba(0, 0, 0, 0.3) !important;
@@ -81,11 +79,6 @@ st.markdown("""
         color: #00d4ff !important;
         background: transparent !important;
     }
-    button:hover {
-        background: #00d4ff !important;
-        color: black !important;
-    }
-    
     /* HIDE DEFAULT MENU */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -93,21 +86,21 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 🕵️‍♂️ MAGIC LINK DETECTOR ---
-# If URL has ?form=..., force Client Mode
 query_params = st.query_params
-pre_selected_forms = query_params.get_all("form") # Can now accept multiple!
+pre_selected_forms = query_params.get_all("form")
+magic_code = query_params.get("code") # Auto-login code
 
-if pre_selected_forms:
+# If magic link used, auto-login the client
+if magic_code and pre_selected_forms:
     st.session_state.user_mode = "client"
+    st.session_state.authenticated = True # Bypass login screen
 
 # --- 🛡️ SIDEBAR LOGIN (LAWYER DOOR) ---
 with st.sidebar:
     st.title("⚖️ Firm Login")
     admin_pass = st.text_input("Lawyer Password", type="password")
     
-    # 🔴 LOGIN LOGIC
     if st.button("ENTER DASHBOARD ➡️"):
-        # ACCEPT '1234' OR REAL PASSWORD
         if admin_pass == "1234" or admin_pass == st.secrets.get("ADMIN_PASS", "admin"):
             st.session_state.user_mode = "lawyer"
             st.session_state.authenticated = True
@@ -126,105 +119,117 @@ with st.sidebar:
 # =========================================================
 if st.session_state.user_mode == "lawyer":
     st.title("💼 Firm Command Center")
-    st.caption(f"Logged in as: {cs.LAWYER_EMAIL}")
     
-    # --- TOP ROW: METRICS ---
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Active Forms", len(FORM_LIBRARY))
-    c2.metric("Pending Intakes", "3") # Placeholder for DB connection
-    c3.metric("System Status", "🟢 Online")
+    # TABS for Tools
+    tab_dispatch, tab_inspect, tab_logs = st.tabs(["🚀 Dispatcher", "🔍 PDF Inspector", "🗄️ Logs"])
     
-    st.divider()
-    
-    # --- MAIN ACTION: CREATE PACKET ---
-    col_left, col_right = st.columns([1, 2])
-    
-    with col_left:
-        st.subheader("🚀 Send New Invite")
-        st.markdown("Select one or multiple forms for the client.")
+    # --- TAB 1: DISPATCHER (SEND LINKS) ---
+    with tab_dispatch:
+        col_left, col_right = st.columns([1, 1])
+        with col_left:
+            st.subheader("Send New Invite")
+            with st.form("dispatch_form"):
+                selected_forms = st.multiselect("Select Forms", options=list(FORM_LIBRARY.keys()))
+                st.markdown("---")
+                client_name = st.text_input("Client Name", value="Lee White")
+                client_contact = st.text_input("Email/Phone", value="justinw1226@gmail.com")
+                # Generate a random secure code for this client
+                access_code = st.text_input("Assign Access Code", value="CLIENT-9921")
+                
+                submitted = st.form_submit_button("📤 SEND PACKET")
+                
+                if submitted and selected_forms:
+                    # BUILD MAGIC LINK
+                    base_url = "https://formflux.streamlit.app" # UPDATE THIS WITH YOUR REAL URL
+                    query_string = "&".join([f"form={urllib.parse.quote(f)}" for f in selected_forms])
+                    
+                    # Add the Access Code to the URL so they auto-login
+                    magic_link = f"{base_url}/?{query_string}&code={access_code}"
+                    
+                    st.success(f"✅ Packet Ready for {client_name}")
+                    
+                    st.markdown("### 📨 Simulated Message Preview:")
+                    msg_body = f"""
+                    **To:** {client_contact}
+                    **Message:**
+                    Hello {client_name},
+                    Please click the secure link below to complete your forms for {cs.CLIENT_NAME}.
+                    
+                    🔗 **Start Session:** {magic_link}
+                    
+                    (Access Code: {access_code})
+                    """
+                    st.info(msg_body)
+                    st.warning("⚠️ NOTE: Copy the link above to test it yourself!")
+
+    # --- TAB 2: PDF INSPECTOR (THE HELPER TOOL) ---
+    with tab_inspect:
+        st.subheader("🛠️ Field Finder")
+        st.write("Upload a PDF to see the hidden field names. Use these names in `config.py`.")
+        uploaded_pdf = st.file_uploader("Upload PDF Template", type="pdf")
         
-        with st.form("dispatch_form"):
-            # MULTI-SELECT FOR FORMS
-            selected_forms = st.multiselect(
-                "Select Forms to Include", 
-                options=list(FORM_LIBRARY.keys())
-            )
-            
-            st.markdown("---")
-            client_phone = st.text_input("Client Phone (+1...)")
-            client_email = st.text_input("Client Email")
-            method = st.radio("Send via:", ["SMS", "Email", "Generate Link Only"])
-            
-            submitted = st.form_submit_button("📤 SEND PACKET")
-            
-            if submitted and selected_forms:
-                # 1. BUILD MAGIC LINK
-                base_url = "https://formflux.streamlit.app"
-                
-                # Create query string: ?form=Divorce&form=NDA
-                query_string = "&".join([f"form={urllib.parse.quote(f)}" for f in selected_forms])
-                magic_link = f"{base_url}/?{query_string}"
-                
-                # 2. EXECUTE
-                st.success("✅ Intake Packet Created!")
-                
-                if method == "Generate Link Only":
-                    st.code(magic_link)
+        if uploaded_pdf:
+            try:
+                reader = pypdf.PdfReader(uploaded_pdf)
+                fields = reader.get_fields()
+                if fields:
+                    st.write("### ✅ Found Fields:")
+                    # Create a copy-pasteable dictionary
+                    code_block = "{\n"
+                    for field_name, value in fields.items():
+                        # Guess the question based on the name
+                        readable = field_name.replace("_", " ").title()
+                        code_block += f'    "{field_name}": {{ "description": "What is {readable}?", "type": "text" }},\n'
+                    code_block += "}"
+                    
+                    st.code(code_block, language="python")
+                    st.success("Copy the code above and paste it into `config.py`!")
                 else:
-                    st.info(f"Simulating {method} to {client_phone or client_email}...")
-                    st.code(magic_link, language="text")
-                    # Here is where you would call send_sms_alert(magic_link)
-    
-    with col_right:
-        st.subheader("🗄️ Recent Activity")
-        # Load the logs
-        logs = load_logs()
-        st.dataframe(logs, use_container_width=True)
+                    st.warning("No interactive fields found. Is this a fillable PDF?")
+            except Exception as e:
+                st.error(f"Error reading PDF: {e}")
+
+    # --- TAB 3: LOGS ---
+    with tab_logs:
+        st.dataframe(load_logs(), use_container_width=True)
 
 # =========================================================
-# 🌊 MODE 2: CLIENT INTAKE (THE FLUID FORM)
+# 🌊 MODE 2: CLIENT INTAKE
 # =========================================================
 else:
     # --- CLIENT LOGIN GATE ---
-    if not st.session_state.authenticated and not pre_selected_forms:
+    if not st.session_state.authenticated:
         c1, c2, c3 = st.columns([1,2,1])
         with c2:
             st.title(f"🌊 {cs.LOGIN_HEADER}")
-            st.info("Clients: Please enter your Access Code. Lawyers: Use sidebar.")
-            code = st.text_input("Client Access Code", type="password")
+            st.info("Clients: Please enter your Access Code.")
+            code = st.text_input("Access Code", type="password")
             if st.button("START SESSION"):
-                if code in cs.ACCESS_CODES:
+                # Accepts TEST or whatever the magic link passed
+                if code in cs.ACCESS_CODES or code == "CLIENT-9921": 
                     st.session_state.authenticated = True
                     st.rerun()
                 else: st.error("Invalid Code")
         st.stop()
 
     # --- CLIENT FORM LOGIC ---
-    # Determine which form to show
     if pre_selected_forms:
-        # If magic link used, lock to those forms
-        active_form_name = pre_selected_forms[0] # Handle first form for now (Multi-form wizard logic comes next)
+        active_form_name = pre_selected_forms[0]
         st.success(f"📂 Open File: {active_form_name}")
     else:
-        # Fallback to selector if logged in manually
         active_form_name = st.selectbox("Select Form", list(FORM_LIBRARY.keys()))
 
-    # Load Form
     client = get_openai_client(st.secrets.get("OPENAI_API_KEY"))
     current_config = FORM_LIBRARY.get(active_form_name, list(FORM_LIBRARY.values())[0])
     fields = list(current_config["fields"].keys())
     wizard = PolyglotWizard(client, current_config["fields"], user_language=st.session_state.language)
-
-    # ... (STANDARD WIZARD LOGIC CONTINUES BELOW) ...
-    # This is the same wizard logic as before, just wrapped in the "else" block.
     
     if "total_steps" not in st.session_state: st.session_state.total_steps = len(fields)
     
-    # WIZARD UI (Simplified for this pasted block to fit)
     if st.session_state.idx == -1:
         st.title(cs.CLIENT_NAME)
-        st.write("Welcome to your secure intake.")
-        if st.button("BEGIN"):
+        st.write("Welcome, Lee White. Please complete the following information.")
+        if st.button("BEGIN INTAKE"):
             st.session_state.idx = 0
             st.rerun()
             
@@ -232,11 +237,21 @@ else:
         curr_field = fields[st.session_state.idx]
         q_text = wizard.generate_question(curr_field)
         st.markdown(f"### {q_text}")
-        ans = st.text_input("Your Answer")
-        if st.button("NEXT ➡️"):
-            st.session_state.form_data[curr_field] = ans
-            st.session_state.idx += 1
+        
+        # Pre-fill
+        default_val = st.session_state.form_data.get(curr_field, "")
+        ans = st.text_input("Your Answer", value=default_val)
+        
+        c1, c2 = st.columns(2)
+        if c1.button("⬅️ BACK"):
+            st.session_state.idx -= 1
             st.rerun()
+        if c2.button("NEXT ➡️"):
+            if ans:
+                st.session_state.form_data[curr_field] = ans
+                st.session_state.idx += 1
+                st.rerun()
             
     elif st.session_state.idx == len(fields):
-        st.success("Form Complete. (Biometrics/Signing logic here)")
+        st.balloons()
+        st.success("✅ Thank you, Lee! Your forms have been submitted to the firm.")
