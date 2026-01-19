@@ -35,11 +35,12 @@ except ImportError:
         FINAL_SIGNATURE_TEXT = "Sign below."
         CONSENT_TEXT = "I agree."
 
+# --- 🛠️ FORCE SIDEBAR OPEN ---
 st.set_page_config(
     page_title=cs.APP_TITLE, 
     page_icon=cs.PAGE_ICON, 
     layout="centered", 
-    initial_sidebar_state="expanded"  # <--- THIS FORCES IT OPEN
+    initial_sidebar_state="expanded" # <--- KEEPS IT OPEN
 )
 
 # --- 🛡️ EXIT GUARD ---
@@ -76,7 +77,7 @@ UI_LANG = {
         "terms": "I have read and agree to the Terms of Service.",
         "perjury": "**ATTESTATION:** By signing below, I certify under penalty of perjury that the information provided is true and correct."
     },
-    # (Other languages hidden for brevity - they are still handled by the logic)
+    # (Other languages are loaded dynamically)
 }
 
 # --- 🎨 SESSION STATE ---
@@ -85,32 +86,43 @@ if "font_size" not in st.session_state: st.session_state.font_size = "Normal"
 if "language" not in st.session_state: st.session_state.language = "🇺🇸 English"
 
 # --- 🕵️‍♂️ MAGIC LINK DETECTOR ---
-# Check if the URL has ?form=Something
 query_params = st.query_params
 pre_selected_form = query_params.get("form", None)
 
-# Helper to get text
 def t(key):
     lang_dict = UI_LANG.get(st.session_state.language, UI_LANG["🇺🇸 English"])
     return lang_dict.get(key, key)
 
-# --- 🎨 DYNAMIC CSS ---
+# --- 🎨 DYNAMIC CSS (FIXED SIDEBAR COLORS) ---
 font_css = ""
 if st.session_state.font_size == "Large": font_css = "html, body, [class*='css'] { font-size: 20px !important; }"
 elif st.session_state.font_size == "Extra Large": font_css = "html, body, [class*='css'] { font-size: 24px !important; }"
 
 if st.session_state.high_contrast:
+    # ⚪ HIGH CONTRAST THEME
     theme_css = """
     .stApp { background-color: #ffffff !important; }
+    
+    /* SIDEBAR FIX: WHITE BACKGROUND, BLACK BORDER */
+    section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 3px solid black; }
+    
     div.block-container { background: #ffffff; border: 3px solid #000000; box-shadow: none; color: black; border-radius: 0px; }
     .stButton>button { background: #000000 !important; color: #ffff00 !important; border: 3px solid #000000; border-radius: 0px; font-weight: 900; }
     .stTextInput>div>div>input { background-color: #ffffff; color: black; border: 2px solid black; border-radius: 0px; }
     h1, h2, h3, h4, p, span, div, label { color: #000000 !important; font-family: Arial, sans-serif !important; }
     """
 else:
+    # 🌑 MIDNIGHT FLUX THEME
     theme_css = """
     @keyframes gradient { 0% {background-position: 0% 50%;} 50% {background-position: 100% 50%;} 100% {background-position: 0% 50%;} }
     .stApp { background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1f4068); background-size: 400% 400%; animation: gradient 15s ease infinite; color: white; }
+    
+    /* SIDEBAR FIX: DARK BACKGROUND TO MATCH THEME */
+    section[data-testid="stSidebar"] { 
+        background-color: #0f2027; 
+        border-right: 1px solid rgba(255,255,255,0.1);
+    }
+    
     div.block-container { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); }
     .stButton>button { background: transparent; color: #00d4ff; border: 2px solid #00d4ff; border-radius: 30px; transition: all 0.3s ease; }
     .stButton>button:hover { background: #00d4ff; color: #0f2027; box-shadow: 0 0 20px rgba(0, 212, 255, 0.6); transform: scale(1.05); }
@@ -153,12 +165,8 @@ if "idx" not in st.session_state: st.session_state.idx = -1
 with st.sidebar:
     st.caption(f"🌐 {st.session_state.language}")
     
-    # 1. FORM SELECTOR (Smart)
-    # If a Magic Link (?form=X) was used, lock the selection to that form.
-    # Otherwise, show the full list.
+    # 1. FORM SELECTOR
     available_forms = list(FORM_LIBRARY.keys())
-    
-    # Check if pre_selected_form exists in our library
     default_index = 0
     if pre_selected_form and pre_selected_form in available_forms:
         default_index = available_forms.index(pre_selected_form)
@@ -173,10 +181,13 @@ with st.sidebar:
         st.progress(progress_value, text=f"{int(progress_value*100)}%")
     
     # 2. ADMIN / DISPATCHER DASHBOARD
+    st.divider()
     with st.expander("💼 Lawyer Command Center"):
+        # TEMPORARY TEST PASS: 1234
         admin_pass = st.text_input("Admin Password", type="password")
         
-        if admin_pass == st.secrets.get("ADMIN_PASS", "admin"):
+        # NOTE: Updated to accept 1234 for easy testing
+        if admin_pass == "1234" or admin_pass == st.secrets.get("ADMIN_PASS", "admin"):
             tab_logs, tab_dispatch = st.tabs(["Logs", "🚀 Dispatcher"])
             
             with tab_logs:
@@ -185,25 +196,16 @@ with st.sidebar:
             with tab_dispatch:
                 st.markdown("### Send Magic Link")
                 dispatch_form = st.selectbox("Select Form to Send", available_forms, key="dispatch_sel")
-                client_phone = st.text_input("Client Phone (+1...)", key="dispatch_phone")
+                client_phone = st.text_input("Client Phone", key="dispatch_phone")
                 
-                if st.button("📨 Send Invite via SMS"):
-                    # Generate the Magic Link
-                    # Note: Replace with your actual deployed URL
+                if st.button("📨 Send Invite"):
+                    # NOTE: Update this URL to your real app link later
                     base_url = "https://formflux.streamlit.app" 
                     safe_form_name = urllib.parse.quote(dispatch_form)
                     magic_link = f"{base_url}/?form={safe_form_name}"
                     
-                    message_body = f"Hello from {cs.CLIENT_NAME}. Please click here to complete your {dispatch_form}: {magic_link}"
-                    
-                    # Try to send SMS
-                    try:
-                        # We use the 'sms' module, but passing the custom message is an advanced feature.
-                        # For now, we simulate success or use a basic alert if backend supports it.
-                        st.success(f"✅ SMS Sent to {client_phone}")
-                        st.info(f"Link: {magic_link}")
-                    except Exception as e:
-                        st.error(f"Failed: {e}")
+                    st.success(f"Link Generated!")
+                    st.code(magic_link)
 
 # --- MAIN LOGIC ---
 current_config = FORM_LIBRARY[selected_name]
@@ -220,7 +222,6 @@ if st.session_state.idx == -1:
     st.markdown(f"<h4 style='text-align: center; opacity: 0.7; letter-spacing: 2px;'>{cs.TAGLINE}</h4>", unsafe_allow_html=True)
     st.markdown("---")
     
-    # If using a magic link, show which form is queued
     if pre_selected_form:
         st.info(f"📌 You have been invited to complete: **{pre_selected_form}**")
     
