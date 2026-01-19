@@ -1,105 +1,101 @@
-import os
-import zipfile
-from datetime import datetime
-from openai import OpenAI
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
+"""
+================================================================================
+  MODULE:       backend.py
+  PROJECT:      FormFluxAI
+  AUTHOR:       Justin White
+  COPYRIGHT:    (c) 2026 FormFluxAI. All Rights Reserved.
+  
+  DESCRIPTION:
+  The "Brain" of the operation. Handles OpenAI integrations, 
+  PDF stamping, and Logic Processing.
+================================================================================
+"""
 
-# --- CLASS 1: THE WIZARD (Handles AI Questions) ---
+import os
+import json
+import pypdf
+from datetime import datetime
+from PIL import Image
+import io
+
 class PolyglotWizard:
-    def __init__(self, client, field_config, user_language="English"):
+    def __init__(self, client, fields_config, user_language="🇺🇸 English"):
         self.client = client
-        self.field_config = field_config
+        self.fields = fields_config
         self.language = user_language
 
     def generate_question(self, field_key):
-        # If no OpenAI Key (Mock Mode), return a standard prompt
+        """Generates a polite question for a specific field."""
+        field_info = self.fields.get(field_key, {})
+        description = field_info.get("description", field_key)
+        
+        # Free Mode (No AI Key)
         if not self.client:
-            field_info = self.field_config.get(field_key, {"description": field_key})
-            return f"🤖 [MOCK AI] Please enter: {field_info['description']}"
-        
-        # If AI is active, generate a polite question
+            return f"{description} ({self.language})"
+
         try:
-            field_info = self.field_config.get(field_key, {"description": field_key})
-            prompt = f"Ask the user for '{field_info['description']}' in {self.language}. Be polite, professional, and brief."
+            prompt = f"Translate this form field question into {self.language}. Make it polite. Field: '{description}'"
             response = self.client.chat.completions.create(
-                model="gpt-4o", messages=[{"role": "system", "content": prompt}]
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3
             )
-            return response.choices[0].message.content
+            return response.choices[0].message.content.strip()
         except:
-            return f"Please enter {field_key}."
+            return description
 
-# --- CLASS 2: THE STAMPER (Handles PDF Creation) ---
+    def chat_with_assistant(self, history, current_form_data):
+        """Analyzes chat history to fill form fields."""
+        if not self.client:
+            return "AI Error: No API Key found.", current_form_data
+
+        missing_fields = [k for k, v in self.fields.items() if k not in current_form_data or not current_form_data[k]]
+        
+        system_prompt = f"""
+        You are a helpful Legal Intake Assistant for FormFluxAI.
+        Current Language: {self.language}
+        
+        FIELDS TO COLLECT (JSON): {json.dumps(self.fields, indent=2)}
+        KNOWN DATA: {json.dumps(current_form_data, indent=2)}
+        
+        INSTRUCTIONS:
+        1. Chat politely.
+        2. Extract new info to update JSON.
+        3. Do NOT ask for known info.
+        
+        OUTPUT JSON: {{ "response": "msg", "updated_data": {{...}} }}
+        """
+
+        try:
+            messages = [{"role": "system", "content": system_prompt}]
+            messages.extend(history[-10:])
+
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+                response_format={"type": "json_object"},
+                temperature=0
+            )
+            result = json.loads(response.choices[0].message.content)
+            return result["response"], result.get("updated_data", {})
+        except Exception as e:
+            return f"Error: {e}", {}
+
 class IdentityStamper:
-    def __init__(self, original_pdf_path=None):
-        self.original_pdf_path = original_pdf_path
+    def __init__(self, template_path=""):
+        self.template_path = template_path
 
-    # Helper: Stamps ONE single PDF
-    def stamp_one_pdf(self, source_pdf, field_data, sig_path, selfie_path, id_path, output_name):
-        c = canvas.Canvas(output_name, pagesize=letter)
-        width, height = letter
-        
-        # 1. Header & Metadata
-        c.setFont("Helvetica", 10)
-        c.drawString(50, height - 30, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-        c.drawString(50, height - 45, f"File: {os.path.basename(source_pdf)}")
+    def compile_final_doc(self, form_data, sig_path, selfie_path, id_path):
+        """Stamps answers onto PDF."""
+        if not os.path.exists(self.template_path): return None
+        reader = pypdf.PdfReader(self.template_path)
+        writer = pypdf.PdfWriter()
 
-        # 2. Dynamic Mapping (The "Sharpie" Logic)
-        # Lists answers down the page. In a real deployment, you'd use specific X/Y coordinates.
-        y_pos = height - 100
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(50, y_pos, "Client Responses:")
-        y_pos -= 20
-        c.setFont("Helvetica", 11)
-        
-        for key, value in field_data.items():
-            # Basic text wrapping to prevent cutoff
-            text = f"{key}: {value}"
-            if len(text) > 80: text = text[:80] + "..."
-            c.drawString(50, y_pos, text)
-            y_pos -= 20
-            
-            # Start a new page if we run out of space
-            if y_pos < 100:
-                c.showPage()
-                y_pos = height - 50
-        
-        # 3. Add Images (Signature, ID) on a new page or at bottom
-        if y_pos < 300: c.showPage(); y_pos = height - 50
-        
-        if os.path.exists(sig_path):
-            c.drawString(50, y_pos - 40, "Signature:")
-            try:
-                c.drawImage(sig_path, 50, y_pos - 100, width=150, height=50, mask='auto')
-            except: pass
+        for page in reader.pages:
+            writer.add_page(page)
+            writer.update_page_form_field_values(writer.pages[-1], form_data)
 
-        c.save()
-        return output_name
-
-    # Main Method: Handles Single Files OR Bundles
-    def compile_final_doc(self, field_data, sig, selfie, gov_id):
-        # Decide if we are making a Bundle (Zip) or Single PDF
-        # Note: In a full app, we would check 'is_bundle' from config. 
-        # For now, we default to the single file logic unless a list is passed.
-        
-        # Default single file output
-        output_filename = "Final_Submission.pdf"
-        
-        # Pass the "Sharpie" method to create the PDF
-        # We use 'self.original_pdf_path' as the template name
-        self.stamp_one_pdf(str(self.original_pdf_path), field_data, sig, selfie, gov_id, output_filename)
-        
-        return output_filename
-        
-    # Optional: Bundle Logic (Future Use)
-    def compile_bundle(self, file_list, field_data, sig, selfie, gov_id):
-        generated_files = []
-        for i, filename in enumerate(file_list):
-            out_name = f"doc_{i}.pdf"
-            self.stamp_one_pdf(filename, field_data, sig, selfie, gov_id, out_name)
-            generated_files.append(out_name)
-            
-        zip_name = "Client_Bundle.zip"
-        with zipfile.ZipFile(zip_name, 'w') as z:
-            for f in generated_files: z.write(f)
-        return zip_name
+        output_stream = io.BytesIO()
+        writer.write(output_stream)
+        output_stream.seek(0)
+        return output_stream.getvalue()
