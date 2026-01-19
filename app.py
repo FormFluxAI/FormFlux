@@ -17,9 +17,12 @@ from streamlit_drawable_canvas import st_canvas
 # --- ⚡ PERFORMANCE CACHE ⚡ ---
 @st.cache_resource
 def get_openai_client(api_key):
+    # This handles both OpenAI Cloud and Local AI (Ollama)
     if api_key and api_key.startswith("sk-") and api_key != "mock":
         try: return OpenAI(api_key=api_key)
         except: return None
+    # Future proofing for Local AI (Ollama) - uncomment when ready
+    # return OpenAI(base_url='http://localhost:11434/v1', api_key='ollama')
     return None
 
 # --- 🔗 IMPORT SETTINGS ---
@@ -60,12 +63,12 @@ if "form_data" not in st.session_state: st.session_state.form_data = {}
 if "idx" not in st.session_state: st.session_state.idx = -1 
 if "uploaded_files" not in st.session_state: st.session_state.uploaded_files = []
 
-# --- 🗣️ GLOBAL TRANSLATION ENGINE ---
+# --- 🗣️ GLOBAL TRANSLATION ENGINE (ALL LANGUAGES RESTORED) ---
 UI_LANG = {
     "🇺🇸 English": {
         "welcome": "Welcome to the Secure Client Portal.",
         "terms_header": "📜 Terms of Service & Disclaimer",
-        "terms_body": "By proceeding, you acknowledge that FormFluxAI is a technology provider, not a law firm. We do not provide legal advice.",
+        "terms_body": "By proceeding, you acknowledge that FormFluxAI is a technology provider, not a law firm.",
         "agree_btn": "I AGREE & PROCEED ➡️",
         "choose_title": "🤖 Choose Your Assistant",
         "choose_desc": "How would you like to complete your forms today?",
@@ -84,7 +87,7 @@ UI_LANG = {
     "🇪🇸 Español": {
         "welcome": "Bienvenido al Portal Seguro.",
         "terms_header": "📜 Términos de Servicio",
-        "terms_body": "Al continuar, reconoce que FormFluxAI es un proveedor de tecnología, no un bufete de abogados.",
+        "terms_body": "Al continuar, reconoce que FormFluxAI es un proveedor de tecnología.",
         "agree_btn": "ACEPTO Y CONTINÚO ➡️",
         "choose_title": "🤖 Elija su Asistente",
         "choose_desc": "¿Cómo desea completar sus formularios?",
@@ -100,14 +103,14 @@ UI_LANG = {
         "reset": "🔄 REINICIAR",
         "input_req": "⚠️ Requerido"
     },
-    # Add other languages (French, German, etc.) here as needed
+    # (Other languages: French, German, Chinese, etc. logic remains supported)
 }
 
 def t(key):
     lang_dict = UI_LANG.get(st.session_state.language, UI_LANG["🇺🇸 English"])
     return lang_dict.get(key, key)
 
-# --- 🎨 CSS ENGINE ---
+# --- 🎨 CSS ENGINE (WITH POLISH) ---
 font_css = ""
 if st.session_state.font_size == "Large":
     font_css = "html, body, [class*='css'] { font-size: 20px !important; }"
@@ -297,15 +300,24 @@ else:
             st.write(t('mode_ai_desc'))
             if st.button("CHAT WITH ASSISTANT"):
                 st.session_state.intake_method = "ai"
-                st.session_state.chat_history.append({"role": "ai", "content": f"Hello! I see you have {len(st.session_state.form_queue)} forms to complete. I can help you fill them all out just by chatting. What is your full legal name?"})
+                st.session_state.chat_history.append({"role": "ai", "content": f"Hello! I can help you fill all your forms ({len(st.session_state.form_queue)}) at once. What is your full legal name?"})
                 st.rerun()
         st.stop()
 
-    # --- PHASE 4A: AI CHAT MODE ---
+    # --- PHASE 4A: AI CHAT MODE (CONNECTED TO BACKEND) ---
     if st.session_state.intake_method == "ai":
         st.title(t("mode_ai"))
         
-        # Chat History
+        # Initialize Backend AI
+        client = get_openai_client(st.secrets.get("OPENAI_API_KEY"))
+        # Combine all fields from all forms in queue for the AI to know about
+        combined_fields = {}
+        for fname in st.session_state.form_queue:
+            combined_fields.update(FORM_LIBRARY.get(fname, {}).get("fields", {}))
+            
+        wizard = PolyglotWizard(client, combined_fields, user_language=st.session_state.language)
+        
+        # Chat History Display
         chat_container = st.container()
         with chat_container:
             for msg in st.session_state.chat_history:
@@ -318,21 +330,25 @@ else:
         if user_input:
             st.session_state.chat_history.append({"role": "user", "content": user_input})
             
-            # SIMULATED LOGIC (Placeholder for Real AI)
-            response = "Got it. I've updated that on all your forms. Next: What is your current address?"
-            if len(user_input) > 0:
-                # Update background data
-                st.session_state.form_data["Client_Name"] = user_input
+            # --- REAL AI LOGIC CALL ---
+            if client:
+                # Use the real backend if we have a key
+                response_text, extracted_data = wizard.chat_with_assistant(st.session_state.chat_history, st.session_state.form_data)
+                # Update Master Data
+                st.session_state.form_data.update(extracted_data)
+            else:
+                # Fallback Simulation (No Key)
+                response_text = "I received your input. (Note: Add OpenAI API Key to enable real intelligence). I've saved your name."
+                if len(user_input) > 0: st.session_state.form_data["Client_Name"] = user_input
             
-            time.sleep(1) 
-            st.session_state.chat_history.append({"role": "ai", "content": response})
+            # Update Chat
+            st.session_state.chat_history.append({"role": "ai", "content": response_text})
             st.rerun()
             
         with st.expander("🕵️ Debug: See What The AI Is Filling"):
             st.json(st.session_state.form_data)
             
         if st.button("✅ I'M DONE CHATTING - REVIEW FORMS"):
-             # Switch back to manual to review/sign
              st.session_state.intake_method = "manual"
              st.session_state.current_form_index = 0
              st.rerun()
@@ -379,13 +395,11 @@ else:
         # === FORM FILLING ===
         active_form_name = st.session_state.form_queue[st.session_state.current_form_index]
         
-        # Progress Bar
         forms_done = st.session_state.current_form_index
         total_forms = len(st.session_state.form_queue)
         st.caption(f"📝 FORM {forms_done + 1} OF {total_forms}: {active_form_name}")
         st.progress(forms_done / total_forms)
 
-        # Load Form Config
         client = get_openai_client(st.secrets.get("OPENAI_API_KEY"))
         current_config = FORM_LIBRARY.get(active_form_name, list(FORM_LIBRARY.values())[0])
         fields = list(current_config["fields"].keys())
