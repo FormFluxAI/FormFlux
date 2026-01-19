@@ -29,58 +29,87 @@ except ImportError:
 st.set_page_config(page_title=cs.APP_TITLE, page_icon=cs.PAGE_ICON, layout="centered")
 
 # ==========================================
-# 🎨 UI OVERHAUL: THE "FLUX" THEME
+# 🎨 UI OVERHAUL: "MIDNIGHT FLUX" THEME
 # ==========================================
-# This CSS hides the framework branding and makes it look like Custom Software.
 st.markdown("""
 <style>
-    /* 1. HIDE STREAMLIT BRANDING */
+    /* 1. ANIMATED BACKGROUND (The "Flux" Effect) */
+    @keyframes gradient {
+        0% {background-position: 0% 50%;}
+        50% {background-position: 100% 50%;}
+        100% {background-position: 0% 50%;}
+    }
+    
+    .stApp {
+        background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1f4068);
+        background-size: 400% 400%;
+        animation: gradient 15s ease infinite;
+        color: white;
+    }
+
+    /* 2. GLASSMORPHISM CARD (The Container) */
+    div.block-container {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 3rem;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        max-width: 700px;
+        margin-top: 2rem;
+    }
+
+    /* 3. NEON BUTTONS */
+    .stButton>button {
+        background: transparent;
+        color: #00d4ff;
+        border: 2px solid #00d4ff;
+        border-radius: 30px;
+        padding: 12px 30px;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        transition: all 0.3s ease;
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.1);
+    }
+    
+    .stButton>button:hover {
+        background: #00d4ff;
+        color: #0f2027;
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.6), 0 0 40px rgba(0, 212, 255, 0.4);
+        transform: scale(1.05);
+        border-color: #00d4ff;
+    }
+
+    /* 4. INPUT FIELDS (Dark Mode Style) */
+    .stTextInput>div>div>input {
+        background-color: rgba(0, 0, 0, 0.3);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+        padding: 10px;
+    }
+    .stTextInput>div>div>input:focus {
+        border-color: #00d4ff;
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+    }
+    
+    /* 5. TYPOGRAPHY & HEADERS */
+    h1, h2, h3, h4, p, span, div {
+        color: white !important;
+        font-family: 'Helvetica Neue', sans-serif;
+    }
+    
+    /* 6. HIDE STREAMLIT BRANDING */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* 2. BACKGROUND & FONTS */
-    .stApp {
-        background-color: #f8f9fa; /* Light Grey Clean Background */
-    }
-    
-    /* 3. FLUID BUTTONS */
-    .stButton>button {
-        background: linear-gradient(45deg, #0077b6, #00b4d8);
-        color: white;
-        border: none;
-        border-radius: 25px;
-        padding: 10px 25px;
-        font-weight: bold;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 8px rgba(0,0,0,0.15);
-        color: white;
-    }
-
-    /* 4. CARD-LIKE CONTAINERS */
-    div.block-container {
-        background-color: white;
-        padding: 3rem;
-        border-radius: 20px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-        max-width: 800px;
-        margin-top: 2rem;
-    }
-    
-    /* 5. INPUT FIELDS */
-    .stTextInput>div>div>input {
-        border-radius: 10px;
-        border: 1px solid #e0e0e0;
-        padding: 10px;
-    }
-    
-    /* 6. PROGRESS BAR FLUX */
+    /* 7. PROGRESS BAR GLOW */
     .stProgress > div > div > div > div {
-        background-image: linear-gradient(to right, #0077b6, #90e0ef);
+        background: linear-gradient(90deg, #00d4ff, #00ff9d);
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -88,13 +117,14 @@ st.markdown("""
 # --- LOGIN GATE ---
 if "authenticated" not in st.session_state: st.session_state.authenticated = False
 if not st.session_state.authenticated:
+    # Centered Login
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
-        st.title(f"🌊 {cs.LOGIN_HEADER}")
-        st.caption(cs.TAGLINE)
+        st.markdown(f"<h1 style='text-align: center;'>🌊 {cs.LOGIN_HEADER}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; opacity: 0.8;'>{cs.TAGLINE}</p>", unsafe_allow_html=True)
         st.divider()
         code = st.text_input("Enter Access Code", type="password")
-        if st.button("Secure Login"):
+        if st.button("AUTHENTICATE"):
             if code in cs.ACCESS_CODES:
                 st.session_state.authenticated = True
                 st.rerun()
@@ -116,9 +146,8 @@ if "idx" not in st.session_state: st.session_state.idx = -1
 selected_name_pre = list(FORM_LIBRARY.keys())[0]
 
 # --- SIDEBAR (Hidden Logic) ---
-# We keep the sidebar minimalist
 with st.sidebar:
-    st.markdown("### ⚙️ Control Panel")
+    st.markdown("### ⚙️ CONTROL PANEL")
     selected_name = st.selectbox("Current File", list(FORM_LIBRARY.keys()))
     
     # Progress Bar
@@ -126,11 +155,11 @@ with st.sidebar:
         safe_idx = max(0, st.session_state.idx)
         safe_idx = min(safe_idx, st.session_state.total_steps)
         progress_value = safe_idx / st.session_state.total_steps
-        st.progress(progress_value, text=f"{int(progress_value*100)}% Complete")
+        st.progress(progress_value, text=f"{int(progress_value*100)}% COMPLETE")
     
     st.divider()
-    with st.expander("🔐 Admin Only"):
-        if st.text_input("Admin Password", type="password") == st.secrets.get("ADMIN_PASS", "admin"):
+    with st.expander("🔐 ADMIN ACCESS"):
+        if st.text_input("Password", type="password") == st.secrets.get("ADMIN_PASS", "admin"):
             st.dataframe(load_logs())
 
 # --- MAIN LOGIC ---
@@ -144,146 +173,11 @@ if "total_steps" not in st.session_state: st.session_state.total_steps = len(fie
 # STAGE 0: WELCOME SCREEN
 # ==========================================
 if st.session_state.idx == -1:
-    st.image("https://img.icons8.com/clouds/200/overview-pages-3.png", width=150) # Placeholder Flux Icon
-    st.title(cs.CLIENT_NAME)
-    st.markdown(f"#### {cs.TAGLINE}")
-    st.info("Secure Intake Portal • 256-bit Encrypted Session")
+    st.markdown(f"<h1 style='text-align: center;'>{cs.CLIENT_NAME}</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h4 style='text-align: center; opacity: 0.7; letter-spacing: 2px;'>{cs.TAGLINE}</h4>", unsafe_allow_html=True)
     
+    st.markdown("---")
     st.markdown("""
-    **Start your intake process below.** * Please have your ID ready.
-    * This session will time out if left inactive.
-    """)
-    
-    if st.button("🚀 Begin Secure Session"):
-        st.session_state.idx = 0
-        st.rerun()
-
-# ==========================================
-# STAGE 1: QUESTIONS
-# ==========================================
-elif st.session_state.idx < len(fields):
-    curr_field = fields[st.session_state.idx]
-    
-    if f"q_{st.session_state.idx}" not in st.session_state:
-        q_text = wizard.generate_question(curr_field)
-        st.session_state[f"q_{st.session_state.idx}"] = q_text
-    else:
-        q_text = st.session_state[f"q_{st.session_state.idx}"]
-
-    # UI: Clean Question Header
-    st.caption(f"Step {st.session_state.idx + 1} of {len(fields)}")
-    st.markdown(f"### {q_text}")
-    
-    with st.form(key=f"form_{st.session_state.idx}"):
-        answer = st.text_input("Type your answer here...", key=f"input_{st.session_state.idx}")
-        
-        c1, c2 = st.columns([1, 4])
-        submitted = c1.form_submit_button("Next Step ➡️")
-        
-        if submitted and answer:
-            st.session_state.form_data[curr_field] = answer
-            st.session_state.idx += 1
-            st.rerun()
-        elif submitted and not answer:
-            st.toast("⚠️ Answer required to proceed.")
-
-# ==========================================
-# STAGE 2: BIOMETRICS
-# ==========================================
-elif st.session_state.idx == len(fields):
-    st.title("🆔 Biometric Verification")
-    st.markdown("We need to verify your identity to prevent fraud.")
-    
-    tab1, tab2 = st.tabs(["📸 Selfie", "💳 ID Card"])
-    
-    with tab1:
-        selfie = st.camera_input("Take a photo of yourself")
-    with tab2:
-        gov_id = st.file_uploader("Upload Government ID", type=['jpg', 'png', 'jpeg'])
-    
-    if selfie and gov_id:
-        st.session_state.temp_selfie = selfie
-        st.session_state.temp_id = gov_id
-        st.success("Verification Data Captured.")
-        if st.button("Continue to Review ➡️"):
-            st.session_state.idx += 1
-            st.rerun()
-
-# ==========================================
-# STAGE 3: REVIEW ANSWERS
-# ==========================================
-elif st.session_state.idx == len(fields) + 1:
-    st.title("📋 Final Review")
-    st.markdown("Please confirm the details below.")
-    
-    with st.container():
-        for key, value in st.session_state.form_data.items():
-            label = current_config["fields"][key]["description"]
-            st.text_input(label, value=value, disabled=True)
-        
-    c1, c2 = st.columns(2)
-    if c1.button("✏️ Edit Answers"):
-        st.session_state.idx = 0 
-        st.rerun()
-        
-    if c2.button("✅ Confirm & Continue"):
-        st.session_state.idx += 1
-        st.rerun()
-
-# ==========================================
-# STAGE 4: SIGN & SUBMIT
-# ==========================================
-elif st.session_state.idx == len(fields) + 2:
-    st.title("✍️ Digital Signature")
-    st.markdown(f"*{cs.FINAL_SIGNATURE_TEXT}*")
-    
-    # Canvas with a border for better UX
-    st.markdown('<div style="border: 2px dashed #ccc; border-radius: 10px;">', unsafe_allow_html=True)
-    sig = st_canvas(stroke_width=2, height=150, key="sig")
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.caption(f"🔒 {cs.CONSENT_TEXT}")
-    
-    if st.button("🚀 Finalize & Submit Case"):
-        if sig.image_data is not None:
-            with st.spinner("Encrypting, Stamping, and Transmitting..."):
-                # 1. Save Assets
-                with open("temp_selfie.jpg","wb") as f: f.write(st.session_state.temp_selfie.getbuffer())
-                with open("temp_id.jpg","wb") as f: f.write(st.session_state.temp_id.getbuffer())
-                Image.fromarray(sig.image_data.astype('uint8'),'RGBA').save("temp_sig.png")
-                
-                # 2. GENERATE PDF (Bundle vs Single)
-                final_output = None
-                if current_config.get("is_bundle"):
-                    stamper = IdentityStamper() 
-                    final_output = stamper.compile_bundle(
-                        current_config['files'], 
-                        st.session_state.form_data, 
-                        "temp_sig.png", "temp_selfie.jpg", "temp_id.jpg"
-                    )
-                else:
-                    target_file = current_config.get('filename', 'default.pdf')
-                    stamper = IdentityStamper(target_file)
-                    final_output = stamper.compile_final_doc(
-                        st.session_state.form_data, 
-                        "temp_sig.png", "temp_selfie.jpg", "temp_id.jpg"
-                    )
-                
-                # 3. Email
-                client_name = st.session_state.form_data.get("txt_FirstName", "Client")
-                target_email = current_config.get("recipient_email", cs.LAWYER_EMAIL)
-                send_secure_email(final_output, client_name, target_email)
-                log_submission(client_name, selected_name, "Success")
-                
-                # 4. SMS
-                phone = st.secrets.get("LAWYER_PHONE_NUMBER")
-                if phone: 
-                    try: send_sms_alert(client_name, selected_name, phone)
-                    except: pass
-                
-                # 5. SUCCESS STATE
-                st.balloons()
-                st.success("✅ Case Filed Successfully!")
-                time.sleep(5)
-                st.session_state.clear()
-                st.rerun()
+    <div style='text-align: center; padding: 20px;'>
+        <p style='font-size: 1.2rem;'>Welcome to the Secure Client Portal.</p>
+        <p style='font-size: 1rem; opacity: 0.6;'>Encrypted • Private • Automated
