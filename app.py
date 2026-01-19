@@ -10,19 +10,15 @@ from sms import send_sms_alert
 from logger import log_submission, load_logs
 from streamlit_drawable_canvas import st_canvas
 
-# --- ⚡ PERFORMANCE: CACHING THE BRAIN ⚡ ---
-# This prevents the app from reconnecting to OpenAI on every click.
-# It makes the app feel 2x faster after the first load.
+# --- ⚡ PERFORMANCE CACHE ⚡ ---
 @st.cache_resource
 def get_openai_client(api_key):
     if api_key and api_key.startswith("sk-") and api_key != "mock":
-        try:
-            return OpenAI(api_key=api_key)
-        except:
-            return None
+        try: return OpenAI(api_key=api_key)
+        except: return None
     return None
 
-# --- 🔗 IMPORT CLIENT SETTINGS ---
+# --- 🔗 IMPORT SETTINGS ---
 try:
     import client_settings as cs
 except ImportError:
@@ -39,46 +35,30 @@ except ImportError:
 
 st.set_page_config(page_title=cs.APP_TITLE, page_icon=cs.PAGE_ICON, layout="centered")
 
-# --- ♿ UNIVERSAL ACCESS MENU ---
-# We put this FIRST so it loads before the visuals
+# --- 🎨 SESSION STATE FOR THEME ---
 if "high_contrast" not in st.session_state: st.session_state.high_contrast = False
 if "font_size" not in st.session_state: st.session_state.font_size = "Normal"
 
-with st.sidebar:
-    st.markdown("### ♿ Accessibility")
-    st.session_state.high_contrast = st.toggle("👁️ High Contrast Mode", value=st.session_state.high_contrast)
-    st.session_state.font_size = st.select_slider("Aa Text Size", options=["Normal", "Large", "Extra Large"])
-    
-    st.divider()
-    
-    # Connection Status Indicator
-    st.markdown("### 📶 System Status")
-    st.caption("🟢 Secure Link Established")
-    st.caption(f"⚡ Latency: {int(time.time() * 1000) % 50}ms") # Simulated Ping
-
-# --- 🎨 DYNAMIC THEME ENGINE ---
-# We swap the CSS based on the user's choice.
-
-# 1. DEFINE FONTS
+# --- 🎨 DYNAMIC CSS ENGINE ---
+# This runs EVERY time the app loads to check the user's preference
 font_css = ""
 if st.session_state.font_size == "Large":
-    font_css = "html, body, [class*='css'] { font-size: 18px !important; }"
+    font_css = "html, body, [class*='css'] { font-size: 20px !important; }"
 elif st.session_state.font_size == "Extra Large":
-    font_css = "html, body, [class*='css'] { font-size: 22px !important; }"
+    font_css = "html, body, [class*='css'] { font-size: 24px !important; }"
 
-# 2. DEFINE THEMES
 if st.session_state.high_contrast:
-    # ⚪ HIGH CONTRAST THEME (White/Black/Yellow)
+    # ⚪ HIGH CONTRAST (Accessibility Mode)
     theme_css = """
-    .stApp { background-color: #ffffff; color: #000000; }
-    div.block-container { background: #ffffff; border: 2px solid #000000; box-shadow: none; color: black; }
-    .stButton>button { background: #000000; color: #ffff00; border: 2px solid #000000; border-radius: 0px; font-weight: 900; }
-    .stButton>button:hover { background: #ffff00; color: #000000; }
-    .stTextInput>div>div>input { background-color: #ffffff; color: black; border: 2px solid black; }
-    h1, h2, h3, p { color: black !important; }
+    .stApp { background-color: #ffffff !important; }
+    div.block-container { background: #ffffff; border: 3px solid #000000; box-shadow: none; color: black; border-radius: 0px; }
+    .stButton>button { background: #000000 !important; color: #ffff00 !important; border: 3px solid #000000; border-radius: 0px; font-weight: 900; }
+    .stButton>button:hover { background: #ffff00 !important; color: #000000 !important; }
+    .stTextInput>div>div>input { background-color: #ffffff; color: black; border: 2px solid black; border-radius: 0px; }
+    h1, h2, h3, h4, p, span, div, label { color: #000000 !important; font-family: Arial, sans-serif !important; }
     """
 else:
-    # 🌑 MIDNIGHT FLUX THEME (The Cool One)
+    # 🌑 MIDNIGHT FLUX (Default Mode)
     theme_css = """
     @keyframes gradient { 0% {background-position: 0% 50%;} 50% {background-position: 100% 50%;} 100% {background-position: 0% 50%;} }
     .stApp { background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1f4068); background-size: 400% 400%; animation: gradient 15s ease infinite; color: white; }
@@ -86,11 +66,11 @@ else:
     .stButton>button { background: transparent; color: #00d4ff; border: 2px solid #00d4ff; border-radius: 30px; transition: all 0.3s ease; }
     .stButton>button:hover { background: #00d4ff; color: #0f2027; box-shadow: 0 0 20px rgba(0, 212, 255, 0.6); transform: scale(1.05); }
     .stTextInput>div>div>input { background-color: rgba(0, 0, 0, 0.3); color: white; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; }
+    h1, h2, h3, h4, p, span, div, label { color: white !important; font-family: 'Helvetica Neue', sans-serif; }
     """
 
-# 3. INJECT CSS
+# Inject CSS
 st.markdown(f"<style>{theme_css} {font_css} #MainMenu {{visibility: hidden;}} footer {{visibility: hidden;}} header {{visibility: hidden;}}</style>", unsafe_allow_html=True)
-
 
 # --- LOGIN GATE ---
 if "authenticated" not in st.session_state: st.session_state.authenticated = False
@@ -100,7 +80,17 @@ if not st.session_state.authenticated:
         st.markdown(f"<h1 style='text-align: center;'>🌊 {cs.LOGIN_HEADER}</h1>", unsafe_allow_html=True)
         st.markdown(f"<p style='text-align: center; opacity: 0.8;'>{cs.TAGLINE}</p>", unsafe_allow_html=True)
         st.divider()
+        
+        # LOGIN INPUTS
         code = st.text_input("Enter Access Code", type="password")
+        
+        # ♿ ACCESSIBILITY CONTROLS (Moved here!)
+        with st.expander("👁️ Display Settings (Accessibility)"):
+            st.session_state.high_contrast = st.toggle("High Contrast Mode", value=st.session_state.high_contrast)
+            st.session_state.font_size = st.select_slider("Text Size", options=["Normal", "Large", "Extra Large"])
+            if st.button("Apply Settings"):
+                st.rerun()
+
         if st.button("AUTHENTICATE"):
             if code in cs.ACCESS_CODES:
                 st.session_state.authenticated = True
@@ -108,7 +98,7 @@ if not st.session_state.authenticated:
             else: st.error("⛔ Access Denied")
     st.stop()
 
-# --- INITIALIZE BRAIN (CACHED) ---
+# --- INITIALIZE BRAIN ---
 client = get_openai_client(st.secrets.get("OPENAI_API_KEY"))
 
 # --- STATE INITIALIZATION ---
@@ -116,24 +106,25 @@ if "form_data" not in st.session_state: st.session_state.form_data = {}
 if "idx" not in st.session_state: st.session_state.idx = -1
 selected_name_pre = list(FORM_LIBRARY.keys())[0]
 
-# --- SIDEBAR CONTROLS ---
+# --- SIDEBAR ---
 with st.sidebar:
+    st.caption(f"⚡ System Latency: {int(time.time() * 1000) % 40}ms")
     selected_name = st.selectbox("Current File", list(FORM_LIBRARY.keys()))
+    
     if "total_steps" in st.session_state and st.session_state.total_steps > 0:
         safe_idx = max(0, st.session_state.idx)
         safe_idx = min(safe_idx, st.session_state.total_steps)
         progress_value = safe_idx / st.session_state.total_steps
         st.progress(progress_value, text=f"{int(progress_value*100)}% COMPLETE")
     
-    with st.expander("🔐 ADMIN ACCESS"):
-        if st.text_input("Password", type="password") == st.secrets.get("ADMIN_PASS", "admin"):
+    with st.expander("🔐 Admin Access"):
+        if st.text_input("Admin Password", type="password") == st.secrets.get("ADMIN_PASS", "admin"):
             st.dataframe(load_logs())
 
 # --- MAIN LOGIC ---
 current_config = FORM_LIBRARY[selected_name]
 fields = list(current_config["fields"].keys())
 wizard = PolyglotWizard(client, current_config["fields"])
-
 if "total_steps" not in st.session_state: st.session_state.total_steps = len(fields)
 
 # ==========================================
@@ -144,7 +135,6 @@ if st.session_state.idx == -1:
     st.markdown(f"<h4 style='text-align: center; opacity: 0.7; letter-spacing: 2px;'>{cs.TAGLINE}</h4>", unsafe_allow_html=True)
     st.markdown("---")
     
-    # Use standard markdown to avoid syntax errors
     st.markdown("""
     <div style='text-align: center; padding: 20px;'>
         <p style='font-size: 1.2rem;'>Welcome to the Secure Client Portal.</p>
@@ -165,8 +155,7 @@ elif st.session_state.idx < len(fields):
     curr_field = fields[st.session_state.idx]
     
     if f"q_{st.session_state.idx}" not in st.session_state:
-        # Show a spinner while the AI thinks (Perceived Speed Increase)
-        with st.spinner("Decryption Protocol Active..."): 
+        with st.spinner("Decryption Protocol Active..."):
             q_text = wizard.generate_question(curr_field)
             st.session_state[f"q_{st.session_state.idx}"] = q_text
     else:
@@ -176,7 +165,6 @@ elif st.session_state.idx < len(fields):
     st.markdown(f"### {q_text}")
     
     with st.form(key=f"form_{st.session_state.idx}"):
-        # Focusing on the input field helps accessibility
         answer = st.text_input("INPUT RESPONSE", key=f"input_{st.session_state.idx}")
         
         c1, c2 = st.columns([1, 1])
@@ -187,21 +175,17 @@ elif st.session_state.idx < len(fields):
             st.session_state.idx += 1
             st.rerun()
         elif submitted and not answer:
-            st.toast("⚠️ Input Required", icon="⚠️")
+            st.toast("⚠️ Input Required")
 
 # ==========================================
 # STAGE 2: BIOMETRICS
 # ==========================================
 elif st.session_state.idx == len(fields):
     st.markdown("### 🆔 IDENTITY VERIFICATION")
-    st.markdown("Please provide biometric data for security compliance.")
     
     tab1, tab2 = st.tabs(["📸 SELFIE", "💳 GOV ID"])
-    
-    with tab1:
-        selfie = st.camera_input("CAPTURE FACE")
-    with tab2:
-        gov_id = st.file_uploader("UPLOAD DOCUMENT", type=['jpg', 'png', 'jpeg'])
+    with tab1: selfie = st.camera_input("CAPTURE FACE")
+    with tab2: gov_id = st.file_uploader("UPLOAD DOCUMENT", type=['jpg', 'png', 'jpeg'])
     
     if selfie and gov_id:
         st.session_state.temp_selfie = selfie
@@ -212,68 +196,45 @@ elif st.session_state.idx == len(fields):
             st.rerun()
 
 # ==========================================
-# STAGE 3: REVIEW ANSWERS
+# STAGE 3: REVIEW
 # ==========================================
 elif st.session_state.idx == len(fields) + 1:
     st.markdown("### 📋 DATA REVIEW")
-    st.markdown("Confirm accuracy of captured data points.")
-    
     with st.container():
         for key, value in st.session_state.form_data.items():
             label = current_config["fields"][key]["description"]
             st.text_input(label, value=value, disabled=True)
-        
     c1, c2 = st.columns(2)
-    if c1.button("✏️ EDIT DATA"):
-        st.session_state.idx = 0 
-        st.rerun()
-        
-    if c2.button("✅ CONFIRM DATA"):
-        st.session_state.idx += 1
-        st.rerun()
+    if c1.button("✏️ EDIT"): st.session_state.idx = 0; st.rerun()
+    if c2.button("✅ CONFIRM"): st.session_state.idx += 1; st.rerun()
 
 # ==========================================
-# STAGE 4: SIGN & SUBMIT
+# STAGE 4: SUBMIT
 # ==========================================
 elif st.session_state.idx == len(fields) + 2:
     st.markdown("### ✍️ FINAL AUTHORIZATION")
-    st.markdown(f"*{cs.FINAL_SIGNATURE_TEXT}*")
-    
-    # Conditional Border for High Contrast
     border_color = "#000000" if st.session_state.high_contrast else "#00d4ff"
-    
     st.markdown(f'<div style="border: 2px solid {border_color}; border-radius: 10px;">', unsafe_allow_html=True)
     sig = st_canvas(stroke_width=2, stroke_color="black" if st.session_state.high_contrast else "white", background_color="rgba(0,0,0,0)", height=150, key="sig")
     st.markdown('</div>', unsafe_allow_html=True)
-    
     st.caption(f"🔒 {cs.CONSENT_TEXT}")
     
     if st.button("🚀 EXECUTE FILING"):
         if sig.image_data is not None:
-            with st.spinner("ENCRYPTING & TRANSMITTING..."):
-                # 1. Save Assets
+            with st.spinner("ENCRYPTING..."):
                 with open("temp_selfie.jpg","wb") as f: f.write(st.session_state.temp_selfie.getbuffer())
                 with open("temp_id.jpg","wb") as f: f.write(st.session_state.temp_id.getbuffer())
                 Image.fromarray(sig.image_data.astype('uint8'),'RGBA').save("temp_sig.png")
                 
-                # 2. GENERATE PDF
                 final_output = None
                 if current_config.get("is_bundle"):
                     stamper = IdentityStamper() 
-                    final_output = stamper.compile_bundle(
-                        current_config['files'], 
-                        st.session_state.form_data, 
-                        "temp_sig.png", "temp_selfie.jpg", "temp_id.jpg"
-                    )
+                    final_output = stamper.compile_bundle(current_config['files'], st.session_state.form_data, "temp_sig.png", "temp_selfie.jpg", "temp_id.jpg")
                 else:
                     target_file = current_config.get('filename', 'default.pdf')
                     stamper = IdentityStamper(target_file)
-                    final_output = stamper.compile_final_doc(
-                        st.session_state.form_data, 
-                        "temp_sig.png", "temp_selfie.jpg", "temp_id.jpg"
-                    )
+                    final_output = stamper.compile_final_doc(st.session_state.form_data, "temp_sig.png", "temp_selfie.jpg", "temp_id.jpg")
                 
-                # 3. Email & SMS
                 client_name = st.session_state.form_data.get("txt_FirstName", "Client")
                 target_email = current_config.get("recipient_email", cs.LAWYER_EMAIL)
                 send_secure_email(final_output, client_name, target_email)
@@ -284,7 +245,6 @@ elif st.session_state.idx == len(fields) + 2:
                     try: send_sms_alert(client_name, selected_name, phone)
                     except: pass
                 
-                # 5. SUCCESS STATE
                 st.balloons()
                 st.success("✅ CASE FILED SUCCESSFULLY.")
                 time.sleep(5)
