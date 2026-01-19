@@ -35,9 +35,65 @@ except ImportError:
 
 st.set_page_config(page_title=cs.APP_TITLE, page_icon=cs.PAGE_ICON, layout="centered")
 
+# --- 🗣️ TRANSLATION DICTIONARY (Static UI) ---
+# The AI handles the questions, but we need to handle the buttons manually.
+UI_LANG = {
+    "English": {
+        "welcome": "Welcome to the Secure Client Portal.",
+        "sub_welcome": "Encrypted • Private • Automated",
+        "start": "INITIALIZE INTAKE",
+        "next": "NEXT STEP ➡️",
+        "back": "⬅️ PREVIOUS",
+        "input_label": "INPUT RESPONSE",
+        "input_help": "Press 'Next' to continue.",
+        "biometrics": "🆔 IDENTITY VERIFICATION",
+        "selfie": "📸 SELFIE",
+        "id_card": "💳 GOV ID",
+        "capture": "CAPTURE FACE",
+        "upload": "UPLOAD DOCUMENT",
+        "bio_success": "✅ BIOMETRICS SECURED",
+        "review": "📋 DATA REVIEW",
+        "edit": "✏️ EDIT",
+        "confirm": "✅ CONFIRM",
+        "sign_header": "✍️ FINAL AUTHORIZATION",
+        "submit": "🚀 EXECUTE FILING",
+        "legal_warning": "⚠️ **LEGAL DISCLAIMER:** This software is an intake tool, not a lawyer. We do not provide legal advice.",
+        "terms": "I have read and agree to the Terms of Service.",
+        "perjury": "**ATTESTATION:** By signing below, I certify under penalty of perjury that the information provided is true and correct."
+    },
+    "Español": {
+        "welcome": "Bienvenido al Portal Seguro del Cliente.",
+        "sub_welcome": "Encriptado • Privado • Automatizado",
+        "start": "INICIAR PROCESO",
+        "next": "SIGUIENTE ➡️",
+        "back": "⬅️ ANTERIOR",
+        "input_label": "INTRODUZCA RESPUESTA",
+        "input_help": "Presione 'Siguiente' para continuar.",
+        "biometrics": "🆔 VERIFICACIÓN DE IDENTIDAD",
+        "selfie": "📸 SELFIE",
+        "id_card": "💳 IDENTIFICACIÓN",
+        "capture": "TOMAR FOTO",
+        "upload": "SUBIR DOCUMENTO",
+        "bio_success": "✅ DATOS BIOMÉTRICOS GUARDADOS",
+        "review": "📋 REVISIÓN DE DATOS",
+        "edit": "✏️ EDITAR",
+        "confirm": "✅ CONFIRMAR",
+        "sign_header": "✍️ AUTORIZACIÓN FINAL",
+        "submit": "🚀 PRESENTAR CASO",
+        "legal_warning": "⚠️ **AVISO LEGAL:** Este software es una herramienta de admisión, no un abogado. No brindamos asesoramiento legal.",
+        "terms": "He leído y acepto los Términos de Servicio.",
+        "perjury": "**ATESTACIÓN:** Al firmar a continuación, certifico bajo pena de perjurio que la información proporcionada es verdadera y correcta."
+    }
+}
+
 # --- 🎨 SESSION STATE ---
 if "high_contrast" not in st.session_state: st.session_state.high_contrast = False
 if "font_size" not in st.session_state: st.session_state.font_size = "Normal"
+if "language" not in st.session_state: st.session_state.language = "English"
+
+# Quick helper to get text based on current language
+def t(key):
+    return UI_LANG[st.session_state.language].get(key, key)
 
 # --- 🎨 DYNAMIC CSS ENGINE ---
 font_css = ""
@@ -66,10 +122,7 @@ else:
     .stTextInput>div>div>input { background-color: rgba(0, 0, 0, 0.3); color: white; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; }
     h1, h2, h3, h4, p, span, div, label { color: white !important; font-family: 'Helvetica Neue', sans-serif; }
     
-    /* FIX: HIDE "PRESS ENTER TO APPLY" OVERLAY */
-    div[data-testid="InputInstructions"] > span:nth-child(1) {
-        display: none;
-    }
+    div[data-testid="InputInstructions"] > span:nth-child(1) { display: none; }
     """
 
 st.markdown(f"<style>{theme_css} {font_css} #MainMenu {{visibility: hidden;}} footer {{visibility: hidden;}} header {{visibility: hidden;}}</style>", unsafe_allow_html=True)
@@ -82,12 +135,15 @@ if not st.session_state.authenticated:
         st.markdown(f"<h1 style='text-align: center;'>🌊 {cs.LOGIN_HEADER}</h1>", unsafe_allow_html=True)
         st.markdown(f"<p style='text-align: center; opacity: 0.8;'>{cs.TAGLINE}</p>", unsafe_allow_html=True)
         st.divider()
-        code = st.text_input("Enter Access Code", type="password")
+        code = st.text_input("Access Code", type="password")
         
-        with st.expander("👁️ Display Settings"):
+        with st.expander("🌐 Language & Display Settings"):
+            # LANGUAGE PICKER
+            st.session_state.language = st.selectbox("Language / Idioma", ["English", "Español"])
+            st.divider()
             st.session_state.high_contrast = st.toggle("High Contrast Mode", value=st.session_state.high_contrast)
             st.session_state.font_size = st.select_slider("Text Size", options=["Normal", "Large", "Extra Large"])
-            if st.button("Apply Settings"): st.rerun()
+            if st.button("Apply / Aplicar"): st.rerun()
 
         if st.button("AUTHENTICATE"):
             if code in cs.ACCESS_CODES:
@@ -106,56 +162,58 @@ selected_name_pre = list(FORM_LIBRARY.keys())[0]
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.caption(f"⚡ System Latency: {int(time.time() * 1000) % 40}ms")
+    st.caption(f"⚡ Latency: {int(time.time() * 1000) % 40}ms | 🌐 {st.session_state.language}")
     selected_name = st.selectbox("Current File", list(FORM_LIBRARY.keys()))
     
     if "total_steps" in st.session_state and st.session_state.total_steps > 0:
         safe_idx = max(0, st.session_state.idx)
         safe_idx = min(safe_idx, st.session_state.total_steps)
         progress_value = safe_idx / st.session_state.total_steps
-        st.progress(progress_value, text=f"{int(progress_value*100)}% COMPLETE")
+        st.progress(progress_value, text=f"{int(progress_value*100)}%")
     
-    with st.expander("🔐 Admin Access"):
-        if st.text_input("Admin Password", type="password") == st.secrets.get("ADMIN_PASS", "admin"):
+    with st.expander("🔐 Admin"):
+        if st.text_input("Password", type="password") == st.secrets.get("ADMIN_PASS", "admin"):
             st.dataframe(load_logs())
 
 # --- LOGIC ---
 current_config = FORM_LIBRARY[selected_name]
 fields = list(current_config["fields"].keys())
-wizard = PolyglotWizard(client, current_config["fields"])
+
+# PASS THE LANGUAGE TO THE WIZARD HERE
+wizard = PolyglotWizard(client, current_config["fields"], user_language=st.session_state.language)
+
 if "total_steps" not in st.session_state: st.session_state.total_steps = len(fields)
 
 # ==========================================
-# STAGE 0: WELCOME & LEGAL CHECK (CYA)
+# STAGE 0: WELCOME & LEGAL CHECK
 # ==========================================
 if st.session_state.idx == -1:
     st.markdown(f"<h1 style='text-align: center;'>{cs.CLIENT_NAME}</h1>", unsafe_allow_html=True)
     st.markdown(f"<h4 style='text-align: center; opacity: 0.7; letter-spacing: 2px;'>{cs.TAGLINE}</h4>", unsafe_allow_html=True)
     st.markdown("---")
     
-    st.markdown("""
+    st.markdown(f"""
     <div style='text-align: center; padding: 20px;'>
-        <p style='font-size: 1.2rem;'>Welcome to the Secure Client Portal.</p>
-        <p style='font-size: 1rem; opacity: 0.6;'>Encrypted • Private • Automated</p>
+        <p style='font-size: 1.2rem;'>{t('welcome')}</p>
+        <p style='font-size: 1rem; opacity: 0.6;'>{t('sub_welcome')}</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # CYA: TERMS OF SERVICE
-    st.warning("⚠️ **LEGAL DISCLAIMER:** This software is an intake tool, not a lawyer. We do not provide legal advice. By proceeding, you agree that your responses will be used to generate draft documents for attorney review.")
-    
-    agree = st.checkbox("I have read and agree to the Terms of Service.")
+    # CYA
+    st.warning(t('legal_warning'))
+    agree = st.checkbox(t('terms'))
 
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
-        if st.button("INITIALIZE INTAKE"):
+        if st.button(t('start')):
             if agree:
                 st.session_state.idx = 0
                 st.rerun()
             else:
-                st.error("You must agree to the Terms to proceed.")
+                st.error("Required / Requerido")
 
 # ==========================================
-# STAGE 1: QUESTIONS (With Back Button)
+# STAGE 1: QUESTIONS
 # ==========================================
 elif st.session_state.idx < len(fields):
     curr_field = fields[st.session_state.idx]
@@ -171,19 +229,14 @@ elif st.session_state.idx < len(fields):
     st.markdown(f"### {q_text}")
     
     with st.form(key=f"form_{st.session_state.idx}"):
-        # Pre-fill with existing answer if they went back
         existing_val = st.session_state.form_data.get(curr_field, "")
-        answer = st.text_input("INPUT RESPONSE", value=existing_val, key=f"input_{st.session_state.idx}")
+        answer = st.text_input(t('input_label'), value=existing_val, key=f"input_{st.session_state.idx}")
         
-        # Helper text instead of the default overlay
-        st.caption("Press 'Next' to continue.")
+        st.caption(t('input_help'))
 
-        # NAV BUTTONS
         c1, c2 = st.columns([1, 1])
-        
-        # Logic for Back/Next
-        go_back = c1.form_submit_button("⬅️ PREVIOUS")
-        go_next = c2.form_submit_button("NEXT STEP ➡️")
+        go_back = c1.form_submit_button(t('back'))
+        go_next = c2.form_submit_button(t('next'))
         
         if go_back:
             st.session_state.idx = max(0, st.session_state.idx - 1)
@@ -195,28 +248,28 @@ elif st.session_state.idx < len(fields):
                 st.session_state.idx += 1
                 st.rerun()
             else:
-                st.toast("⚠️ Answer Required")
+                st.toast("⚠️ Required / Requerido")
 
 # ==========================================
 # STAGE 2: BIOMETRICS
 # ==========================================
 elif st.session_state.idx == len(fields):
-    st.markdown("### 🆔 IDENTITY VERIFICATION")
+    st.markdown(f"### {t('biometrics')}")
     
-    tab1, tab2 = st.tabs(["📸 SELFIE", "💳 GOV ID"])
-    with tab1: selfie = st.camera_input("CAPTURE FACE")
-    with tab2: gov_id = st.file_uploader("UPLOAD DOCUMENT", type=['jpg', 'png', 'jpeg'])
+    tab1, tab2 = st.tabs([t('selfie'), t('id_card')])
+    with tab1: selfie = st.camera_input(t('capture'))
+    with tab2: gov_id = st.file_uploader(t('upload'), type=['jpg', 'png', 'jpeg'])
     
     if selfie and gov_id:
         st.session_state.temp_selfie = selfie
         st.session_state.temp_id = gov_id
-        st.success("✅ BIOMETRICS SECURED")
+        st.success(t('bio_success'))
         
         c1, c2 = st.columns(2)
-        if c1.button("⬅️ BACK"):
+        if c1.button(t('back')):
             st.session_state.idx -= 1
             st.rerun()
-        if c2.button("PROCEED TO REVIEW ➡️"):
+        if c2.button(t('next')):
             st.session_state.idx += 1
             st.rerun()
 
@@ -224,25 +277,22 @@ elif st.session_state.idx == len(fields):
 # STAGE 3: REVIEW
 # ==========================================
 elif st.session_state.idx == len(fields) + 1:
-    st.markdown("### 📋 DATA REVIEW")
+    st.markdown(f"### {t('review')}")
     with st.container():
         for key, value in st.session_state.form_data.items():
             label = current_config["fields"][key]["description"]
             st.text_input(label, value=value, disabled=True)
     c1, c2 = st.columns(2)
-    if c1.button("✏️ EDIT"): st.session_state.idx = 0; st.rerun()
-    if c2.button("✅ CONFIRM"): st.session_state.idx += 1; st.rerun()
+    if c1.button(t('edit')): st.session_state.idx = 0; st.rerun()
+    if c2.button(t('confirm')): st.session_state.idx += 1; st.rerun()
 
 # ==========================================
-# STAGE 4: SUBMIT (With Perjury Clause)
+# STAGE 4: SUBMIT
 # ==========================================
 elif st.session_state.idx == len(fields) + 2:
-    st.markdown("### ✍️ FINAL AUTHORIZATION")
+    st.markdown(f"### {t('sign_header')}")
     
-    # PERJURY PARAGRAPH (CYA)
-    st.info("""
-    **ATTESTATION:** By signing below, I certify under penalty of perjury that the information provided in this session is true, correct, and complete to the best of my knowledge. I understand that false statements may result in the rejection of my legal filing.
-    """)
+    st.info(t('perjury'))
     
     border_color = "#000000" if st.session_state.high_contrast else "#00d4ff"
     st.markdown(f'<div style="border: 2px solid {border_color}; border-radius: 10px;">', unsafe_allow_html=True)
@@ -250,7 +300,7 @@ elif st.session_state.idx == len(fields) + 2:
     st.markdown('</div>', unsafe_allow_html=True)
     st.caption(f"🔒 {cs.CONSENT_TEXT}")
     
-    if st.button("🚀 EXECUTE FILING"):
+    if st.button(t('submit')):
         if sig.image_data is not None:
             with st.spinner("ENCRYPTING..."):
                 with open("temp_selfie.jpg","wb") as f: f.write(st.session_state.temp_selfie.getbuffer())
@@ -277,7 +327,7 @@ elif st.session_state.idx == len(fields) + 2:
                     except: pass
                 
                 st.balloons()
-                st.success("✅ CASE FILED SUCCESSFULLY.")
+                st.success("✅ SUCCESS / ÉXITO")
                 time.sleep(5)
                 st.session_state.clear()
                 st.rerun()
