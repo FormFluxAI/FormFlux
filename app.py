@@ -3,7 +3,7 @@ import streamlit.components.v1 as components
 import os
 import time
 import urllib.parse
-import pypdf # NEEDED FOR INSPECTOR
+import pypdf # The Inspector Engine
 from PIL import Image
 from openai import OpenAI
 from backend import PolyglotWizard, IdentityStamper
@@ -74,10 +74,18 @@ st.markdown("""
         color: white !important;
         border: 1px solid rgba(255, 255, 255, 0.2);
     }
+    /* RADIO & CHECKBOX TEXT */
+    label, .stRadio, .stCheckbox {
+        color: white !important;
+    }
     button {
         border: 1px solid #00d4ff !important;
         color: #00d4ff !important;
         background: transparent !important;
+    }
+    button:hover {
+        background: #00d4ff !important;
+        color: black !important;
     }
     /* HIDE DEFAULT MENU */
     #MainMenu {visibility: hidden;}
@@ -88,18 +96,16 @@ st.markdown("""
 # --- 🕵️‍♂️ MAGIC LINK DETECTOR ---
 query_params = st.query_params
 pre_selected_forms = query_params.get_all("form")
-magic_code = query_params.get("code") # Auto-login code
+magic_code = query_params.get("code")
 
-# If magic link used, auto-login the client
 if magic_code and pre_selected_forms:
     st.session_state.user_mode = "client"
-    st.session_state.authenticated = True # Bypass login screen
+    st.session_state.authenticated = True 
 
 # --- 🛡️ SIDEBAR LOGIN (LAWYER DOOR) ---
 with st.sidebar:
     st.title("⚖️ Firm Login")
     admin_pass = st.text_input("Lawyer Password", type="password")
-    
     if st.button("ENTER DASHBOARD ➡️"):
         if admin_pass == "1234" or admin_pass == st.secrets.get("ADMIN_PASS", "admin"):
             st.session_state.user_mode = "lawyer"
@@ -120,52 +126,26 @@ with st.sidebar:
 if st.session_state.user_mode == "lawyer":
     st.title("💼 Firm Command Center")
     
-    # TABS for Tools
     tab_dispatch, tab_inspect, tab_logs = st.tabs(["🚀 Dispatcher", "🔍 PDF Inspector", "🗄️ Logs"])
     
-    # --- TAB 1: DISPATCHER (SEND LINKS) ---
+    # --- DISPATCHER ---
     with tab_dispatch:
-        col_left, col_right = st.columns([1, 1])
-        with col_left:
-            st.subheader("Send New Invite")
-            with st.form("dispatch_form"):
-                selected_forms = st.multiselect("Select Forms", options=list(FORM_LIBRARY.keys()))
-                st.markdown("---")
-                client_name = st.text_input("Client Name", value="Lee White")
-                client_contact = st.text_input("Email/Phone", value="justinw1226@gmail.com")
-                # Generate a random secure code for this client
-                access_code = st.text_input("Assign Access Code", value="CLIENT-9921")
-                
-                submitted = st.form_submit_button("📤 SEND PACKET")
-                
-                if submitted and selected_forms:
-                    # BUILD MAGIC LINK
-                    base_url = "https://formflux.streamlit.app" # UPDATE THIS WITH YOUR REAL URL
-                    query_string = "&".join([f"form={urllib.parse.quote(f)}" for f in selected_forms])
-                    
-                    # Add the Access Code to the URL so they auto-login
-                    magic_link = f"{base_url}/?{query_string}&code={access_code}"
-                    
-                    st.success(f"✅ Packet Ready for {client_name}")
-                    
-                    st.markdown("### 📨 Simulated Message Preview:")
-                    msg_body = f"""
-                    **To:** {client_contact}
-                    **Message:**
-                    Hello {client_name},
-                    Please click the secure link below to complete your forms for {cs.CLIENT_NAME}.
-                    
-                    🔗 **Start Session:** {magic_link}
-                    
-                    (Access Code: {access_code})
-                    """
-                    st.info(msg_body)
-                    st.warning("⚠️ NOTE: Copy the link above to test it yourself!")
+        st.subheader("Send New Invite")
+        with st.form("dispatch_form"):
+            selected_forms = st.multiselect("Select Forms", options=list(FORM_LIBRARY.keys()))
+            client_name = st.text_input("Client Name", value="Lee White")
+            submitted = st.form_submit_button("📤 GENERATE LINK")
+            if submitted and selected_forms:
+                base_url = "https://formflux.streamlit.app"
+                query_string = "&".join([f"form={urllib.parse.quote(f)}" for f in selected_forms])
+                magic_link = f"{base_url}/?{query_string}&code=CLIENT-9921"
+                st.success(f"Link Created for {client_name}")
+                st.code(magic_link)
 
-    # --- TAB 2: PDF INSPECTOR (THE HELPER TOOL) ---
+    # --- PDF INSPECTOR (UPGRADED) ---
     with tab_inspect:
-        st.subheader("🛠️ Field Finder")
-        st.write("Upload a PDF to see the hidden field names. Use these names in `config.py`.")
+        st.subheader("🛠️ Universal Field Finder")
+        st.write("This tool now detects Text, Checkboxes, and Radio Buttons.")
         uploaded_pdf = st.file_uploader("Upload PDF Template", type="pdf")
         
         if uploaded_pdf:
@@ -173,23 +153,31 @@ if st.session_state.user_mode == "lawyer":
                 reader = pypdf.PdfReader(uploaded_pdf)
                 fields = reader.get_fields()
                 if fields:
-                    st.write("### ✅ Found Fields:")
-                    # Create a copy-pasteable dictionary
+                    st.write("### ✅ Smart Field Detection:")
                     code_block = "{\n"
-                    for field_name, value in fields.items():
-                        # Guess the question based on the name
-                        readable = field_name.replace("_", " ").title()
-                        code_block += f'    "{field_name}": {{ "description": "What is {readable}?", "type": "text" }},\n'
-                    code_block += "}"
                     
+                    for field_name, data in fields.items():
+                        # GUESS THE TYPE
+                        field_type = "text" # Default
+                        options_str = ""
+                        
+                        # If it has '/Btn', it's a checkbox or radio
+                        if '/FT' in data and data['/FT'] == '/Btn':
+                            # It is likely a Checkbox or Radio
+                            field_type = "checkbox" 
+                            # If we see 'Yes' or 'No' in the name, hint at it
+                            options_str = ', "options": ["True", "False"]'
+                        
+                        readable = field_name.replace("_", " ").title()
+                        
+                        code_block += f'    "{field_name}": {{ "description": "What is {readable}?", "type": "{field_type}"{options_str} }},\n'
+                    
+                    code_block += "}"
                     st.code(code_block, language="python")
-                    st.success("Copy the code above and paste it into `config.py`!")
-                else:
-                    st.warning("No interactive fields found. Is this a fillable PDF?")
+                    st.success("Paste this into `config.py`!")
             except Exception as e:
-                st.error(f"Error reading PDF: {e}")
+                st.error(f"Error: {e}")
 
-    # --- TAB 3: LOGS ---
     with tab_logs:
         st.dataframe(load_logs(), use_container_width=True)
 
@@ -197,7 +185,7 @@ if st.session_state.user_mode == "lawyer":
 # 🌊 MODE 2: CLIENT INTAKE
 # =========================================================
 else:
-    # --- CLIENT LOGIN GATE ---
+    # --- CLIENT LOGIN ---
     if not st.session_state.authenticated:
         c1, c2, c3 = st.columns([1,2,1])
         with c2:
@@ -205,14 +193,13 @@ else:
             st.info("Clients: Please enter your Access Code.")
             code = st.text_input("Access Code", type="password")
             if st.button("START SESSION"):
-                # Accepts TEST or whatever the magic link passed
                 if code in cs.ACCESS_CODES or code == "CLIENT-9921": 
                     st.session_state.authenticated = True
                     st.rerun()
                 else: st.error("Invalid Code")
         st.stop()
 
-    # --- CLIENT FORM LOGIC ---
+    # --- FORM LOADER ---
     if pre_selected_forms:
         active_form_name = pre_selected_forms[0]
         st.success(f"📂 Open File: {active_form_name}")
@@ -226,6 +213,7 @@ else:
     
     if "total_steps" not in st.session_state: st.session_state.total_steps = len(fields)
     
+    # --- WIZARD START ---
     if st.session_state.idx == -1:
         st.title(cs.CLIENT_NAME)
         st.write("Welcome, Lee White. Please complete the following information.")
@@ -234,24 +222,56 @@ else:
             st.rerun()
             
     elif st.session_state.idx < len(fields):
-        curr_field = fields[st.session_state.idx]
-        q_text = wizard.generate_question(curr_field)
+        # 1. GET CURRENT FIELD DATA
+        curr_field_key = fields[st.session_state.idx]
+        field_info = current_config["fields"][curr_field_key]
+        
+        # 2. ASK THE QUESTION (AI)
+        q_text = wizard.generate_question(curr_field_key)
         st.markdown(f"### {q_text}")
         
-        # Pre-fill
-        default_val = st.session_state.form_data.get(curr_field, "")
-        ans = st.text_input("Your Answer", value=default_val)
+        # 3. RENDER THE CORRECT INPUT TYPE
+        # Check what 'type' is set in config.py
+        ftype = field_info.get("type", "text")
         
+        # --- TYPE: TEXT ---
+        if ftype == "text":
+            default_val = st.session_state.form_data.get(curr_field_key, "")
+            ans = st.text_input("Type your answer:", value=default_val)
+            
+        # --- TYPE: YES/NO or RADIO ---
+        elif ftype == "radio":
+            opts = field_info.get("options", ["Yes", "No"])
+            # Default to index 0 if not set
+            current_idx = 0
+            if curr_field_key in st.session_state.form_data:
+                try: current_idx = opts.index(st.session_state.form_data[curr_field_key])
+                except: pass
+            ans = st.radio("Select one:", opts, index=current_idx)
+            
+        # --- TYPE: CHECKBOX (Single) ---
+        elif ftype == "checkbox":
+            # True/False
+            default_bool = False
+            if st.session_state.form_data.get(curr_field_key) == "Yes": default_bool = True
+            
+            check = st.checkbox(field_info.get("description", "Check here"), value=default_bool)
+            ans = "Yes" if check else "No"
+
+        # 4. NAVIGATION
+        st.markdown("---")
         c1, c2 = st.columns(2)
         if c1.button("⬅️ BACK"):
             st.session_state.idx -= 1
             st.rerun()
         if c2.button("NEXT ➡️"):
-            if ans:
-                st.session_state.form_data[curr_field] = ans
+            if ans: # Ensure they answered
+                st.session_state.form_data[curr_field_key] = ans
                 st.session_state.idx += 1
                 st.rerun()
+            else:
+                st.toast("⚠️ Input Required")
             
     elif st.session_state.idx == len(fields):
         st.balloons()
-        st.success("✅ Thank you, Lee! Your forms have been submitted to the firm.")
+        st.success("✅ Thank you, Lee! Your forms have been submitted.")
