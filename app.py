@@ -35,10 +35,9 @@ except ImportError:
 
 st.set_page_config(page_title=cs.APP_TITLE, page_icon=cs.PAGE_ICON, layout="centered")
 
-# --- 🗣️ TRANSLATION DICTIONARY (Static UI) ---
-# The AI handles the questions, but we need to handle the buttons manually.
+# --- 🗣️ THE "BIG 6" TRANSLATION ENGINE ---
 UI_LANG = {
-    "English": {
+    "🇺🇸 English": {
         "welcome": "Welcome to the Secure Client Portal.",
         "sub_welcome": "Encrypted • Private • Automated",
         "start": "INITIALIZE INTAKE",
@@ -61,7 +60,7 @@ UI_LANG = {
         "terms": "I have read and agree to the Terms of Service.",
         "perjury": "**ATTESTATION:** By signing below, I certify under penalty of perjury that the information provided is true and correct."
     },
-    "Español": {
+    "🇪🇸 Español": {
         "welcome": "Bienvenido al Portal Seguro del Cliente.",
         "sub_welcome": "Encriptado • Privado • Automatizado",
         "start": "INICIAR PROCESO",
@@ -80,20 +79,114 @@ UI_LANG = {
         "confirm": "✅ CONFIRMAR",
         "sign_header": "✍️ AUTORIZACIÓN FINAL",
         "submit": "🚀 PRESENTAR CASO",
-        "legal_warning": "⚠️ **AVISO LEGAL:** Este software es una herramienta de admisión, no un abogado. No brindamos asesoramiento legal.",
+        "legal_warning": "⚠️ **AVISO LEGAL:** Este software no es un abogado. No brindamos asesoramiento legal.",
         "terms": "He leído y acepto los Términos de Servicio.",
-        "perjury": "**ATESTACIÓN:** Al firmar a continuación, certifico bajo pena de perjurio que la información proporcionada es verdadera y correcta."
+        "perjury": "**ATESTACIÓN:** Certifico bajo pena de perjurio que la información es verdadera."
+    },
+    "🇫🇷 Français": {
+        "welcome": "Bienvenue sur le Portail Sécurisé.",
+        "sub_welcome": "Chiffré • Privé • Automatisé",
+        "start": "COMMENCER",
+        "next": "SUIVANT ➡️",
+        "back": "⬅️ RETOUR",
+        "input_label": "VOTRE RÉPONSE",
+        "input_help": "Appuyez sur 'Suivant' pour continuer.",
+        "biometrics": "🆔 VÉRIFICATION D'IDENTITÉ",
+        "selfie": "📸 SELFIE",
+        "id_card": "💳 PIÈCE D'IDENTITÉ",
+        "capture": "PRENDRE PHOTO",
+        "upload": "TÉLÉCHARGER",
+        "bio_success": "✅ DONNÉES SÉCURISÉES",
+        "review": "📋 VÉRIFICATION",
+        "edit": "✏️ MODIFIER",
+        "confirm": "✅ CONFIRMER",
+        "sign_header": "✍️ SIGNATURE FINALE",
+        "submit": "🚀 SOUMETTRE LE DOSSIER",
+        "legal_warning": "⚠️ **AVIS JURIDIQUE:** Ce logiciel n'est pas un avocat. Nous ne donnons pas de conseils juridiques.",
+        "terms": "J'ai lu et j'accepte les conditions d'utilisation.",
+        "perjury": "**ATTESTATION:** Je certifie sous peine de parjure que les informations sont exactes."
+    },
+    "🇩🇪 Deutsch": {
+        "welcome": "Willkommen im sicheren Kundenportal.",
+        "sub_welcome": "Verschlüsselt • Privat • Automatisiert",
+        "start": "STARTEN",
+        "next": "WEITER ➡️",
+        "back": "⬅️ ZURÜCK",
+        "input_label": "IHRE ANTWORT",
+        "input_help": "Drücken Sie 'Weiter'.",
+        "biometrics": "🆔 IDENTITÄTSPRÜFUNG",
+        "selfie": "📸 SELFIE",
+        "id_card": "💳 AUSWEIS",
+        "capture": "FOTO AUFNEHMEN",
+        "upload": "HOCHLADEN",
+        "bio_success": "✅ DATEN GESICHERT",
+        "review": "📋 ÜBERPRÜFUNG",
+        "edit": "✏️ BEARBEITEN",
+        "confirm": "✅ BESTÄTIGEN",
+        "sign_header": "✍️ UNTERSCHRIFT",
+        "submit": "🚀 EINREICHEN",
+        "legal_warning": "⚠️ **RECHTLICHER HINWEIS:** Diese Software ist kein Anwalt. Wir bieten keine Rechtsberatung.",
+        "terms": "Ich stimme den Nutzungsbedingungen zu.",
+        "perjury": "**ERKLÄRUNG:** Ich bestätige an Eides statt, dass die Angaben wahrheitsgemäß sind."
+    },
+    "🇧🇷 Português": {
+        "welcome": "Bem-vindo ao Portal Seguro.",
+        "sub_welcome": "Criptografado • Privado • Automatizado",
+        "start": "INICIAR",
+        "next": "PRÓXIMO ➡️",
+        "back": "⬅️ ANTERIOR",
+        "input_label": "SUA RESPOSTA",
+        "input_help": "Pressione 'Próximo' para continuar.",
+        "biometrics": "🆔 VERIFICAÇÃO DE IDENTIDADE",
+        "selfie": "📸 SELFIE",
+        "id_card": "💳 IDENTIDADE",
+        "capture": "TIRAR FOTO",
+        "upload": "ENVIAR DOCUMENTO",
+        "bio_success": "✅ DADOS SEGUROS",
+        "review": "📋 REVISÃO",
+        "edit": "✏️ EDITAR",
+        "confirm": "✅ CONFIRMAR",
+        "sign_header": "✍️ ASSINATURA FINAL",
+        "submit": "🚀 ENVIAR PROCESSO",
+        "legal_warning": "⚠️ **AVISO LEGAL:** Este software não é um advogado. Não prestamos consultoria jurídica.",
+        "terms": "Li e concordo com os Termos de Serviço.",
+        "perjury": "**ATESTADO:** Certifico sob pena de perjúrio que as informações são verdadeiras."
+    },
+    "🇨🇳 中文": {
+        "welcome": "欢迎使用安全客户门户",
+        "sub_welcome": "加密 • 私密 • 自动化",
+        "start": "开始流程",
+        "next": "下一步 ➡️",
+        "back": "⬅️ 上一步",
+        "input_label": "输入回答",
+        "input_help": "按“下一步”继续",
+        "biometrics": "🆔 身份验证",
+        "selfie": "📸 自拍",
+        "id_card": "💳 身份证件",
+        "capture": "拍照",
+        "upload": "上传文件",
+        "bio_success": "✅ 数据已保存",
+        "review": "📋 数据审查",
+        "edit": "✏️ 编辑",
+        "confirm": "✅ 确认",
+        "sign_header": "✍️ 最终签名",
+        "submit": "🚀 提交案件",
+        "legal_warning": "⚠️ **法律免责声明:** 本软件仅为录入工具，非律师服务。我们不提供法律建议。",
+        "terms": "我已阅读并同意服务条款。",
+        "perjury": "**声明:** 我在此声明所提供的信息真实无误，如有虚假愿承担法律责任。"
     }
 }
 
 # --- 🎨 SESSION STATE ---
 if "high_contrast" not in st.session_state: st.session_state.high_contrast = False
 if "font_size" not in st.session_state: st.session_state.font_size = "Normal"
-if "language" not in st.session_state: st.session_state.language = "English"
+if "language" not in st.session_state: st.session_state.language = "🇺🇸 English"
 
 # Quick helper to get text based on current language
 def t(key):
-    return UI_LANG[st.session_state.language].get(key, key)
+    # Default to English if key missing
+    lang_dict = UI_LANG.get(st.session_state.language, UI_LANG["🇺🇸 English"])
+    return lang_dict.get(key, key)
 
 # --- 🎨 DYNAMIC CSS ENGINE ---
 font_css = ""
@@ -138,12 +231,12 @@ if not st.session_state.authenticated:
         code = st.text_input("Access Code", type="password")
         
         with st.expander("🌐 Language & Display Settings"):
-            # LANGUAGE PICKER
-            st.session_state.language = st.selectbox("Language / Idioma", ["English", "Español"])
+            # LANGUAGE PICKER (WITH FLAGS)
+            st.session_state.language = st.selectbox("Select Language", list(UI_LANG.keys()))
             st.divider()
             st.session_state.high_contrast = st.toggle("High Contrast Mode", value=st.session_state.high_contrast)
             st.session_state.font_size = st.select_slider("Text Size", options=["Normal", "Large", "Extra Large"])
-            if st.button("Apply / Aplicar"): st.rerun()
+            if st.button("Apply Settings"): st.rerun()
 
         if st.button("AUTHENTICATE"):
             if code in cs.ACCESS_CODES:
@@ -179,7 +272,7 @@ with st.sidebar:
 current_config = FORM_LIBRARY[selected_name]
 fields = list(current_config["fields"].keys())
 
-# PASS THE LANGUAGE TO THE WIZARD HERE
+# PASS THE LANGUAGE TO THE WIZARD
 wizard = PolyglotWizard(client, current_config["fields"], user_language=st.session_state.language)
 
 if "total_steps" not in st.session_state: st.session_state.total_steps = len(fields)
@@ -210,7 +303,7 @@ if st.session_state.idx == -1:
                 st.session_state.idx = 0
                 st.rerun()
             else:
-                st.error("Required / Requerido")
+                st.error("Required")
 
 # ==========================================
 # STAGE 1: QUESTIONS
@@ -248,7 +341,7 @@ elif st.session_state.idx < len(fields):
                 st.session_state.idx += 1
                 st.rerun()
             else:
-                st.toast("⚠️ Required / Requerido")
+                st.toast("⚠️ Required")
 
 # ==========================================
 # STAGE 2: BIOMETRICS
@@ -327,7 +420,7 @@ elif st.session_state.idx == len(fields) + 2:
                     except: pass
                 
                 st.balloons()
-                st.success("✅ SUCCESS / ÉXITO")
+                st.success("✅ SUCCESS")
                 time.sleep(5)
                 st.session_state.clear()
                 st.rerun()
