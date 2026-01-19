@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import os
 import time
 from PIL import Image
@@ -35,7 +36,18 @@ except ImportError:
 
 st.set_page_config(page_title=cs.APP_TITLE, page_icon=cs.PAGE_ICON, layout="centered")
 
-# --- 🗣️ THE "BIG 6" TRANSLATION ENGINE ---
+# --- 🛡️ EXIT GUARD (PREVENTS ACCIDENTAL REFRESH) ---
+# This injects a script that warns the user if they try to close the tab or refresh.
+# It does NOT save the data (which protects privacy), it just stops the action.
+components.html("""
+<script>
+    window.parent.window.onbeforeunload = function() {
+        return "You have unsaved changes. Are you sure you want to leave?";
+    };
+</script>
+""", height=0)
+
+# --- 🗣️ TRANSLATION ENGINE ---
 UI_LANG = {
     "🇺🇸 English": {
         "welcome": "Welcome to the Secure Client Portal.",
@@ -184,7 +196,6 @@ if "language" not in st.session_state: st.session_state.language = "🇺🇸 Eng
 
 # Quick helper to get text based on current language
 def t(key):
-    # Default to English if key missing
     lang_dict = UI_LANG.get(st.session_state.language, UI_LANG["🇺🇸 English"])
     return lang_dict.get(key, key)
 
@@ -231,7 +242,6 @@ if not st.session_state.authenticated:
         code = st.text_input("Access Code", type="password")
         
         with st.expander("🌐 Language & Display Settings"):
-            # LANGUAGE PICKER (WITH FLAGS)
             st.session_state.language = st.selectbox("Select Language", list(UI_LANG.keys()))
             st.divider()
             st.session_state.high_contrast = st.toggle("High Contrast Mode", value=st.session_state.high_contrast)
@@ -271,8 +281,6 @@ with st.sidebar:
 # --- LOGIC ---
 current_config = FORM_LIBRARY[selected_name]
 fields = list(current_config["fields"].keys())
-
-# PASS THE LANGUAGE TO THE WIZARD
 wizard = PolyglotWizard(client, current_config["fields"], user_language=st.session_state.language)
 
 if "total_steps" not in st.session_state: st.session_state.total_steps = len(fields)
