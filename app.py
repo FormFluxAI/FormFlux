@@ -22,10 +22,11 @@ def get_openai_client(api_key):
         except: return None
     return None
 
-# --- 🔗 IMPORT SETTINGS ---
+# --- 🔗 IMPORT SETTINGS (DEMO MODE) ---
 try:
     import client_settings as cs
 except ImportError:
+    # DEFAULT DEMO SETTINGS
     class cs:
         APP_TITLE = "She's Always Right, Esq."
         PAGE_ICON = "⚖️"
@@ -34,7 +35,7 @@ except ImportError:
         CLIENT_NAME = "She's Always Right, Esq."
         ACCESS_CODES = ["TEST", "GWEN-RULES"]
         LAWYER_EMAIL = "gwendolyn@alwaysright.com"
-        FINAL_SIGNATURE_TEXT = "Sign here to admit I was right."
+        FINAL_SIGNATURE_TEXT = "By signing, I admit that I have read the terms."
         CONSENT_TEXT = "I officially agree."
 
 # --- 🛠️ SETUP PAGE ---
@@ -52,7 +53,13 @@ UI_LANG = {
         "start": "START SESSION",
         "next": "NEXT ➡️",
         "back": "⬅️ BACK",
-        "submit": "✅ SUBMIT FORM",
+        "review_title": "📋 Review Your Answers",
+        "review_desc": "Please verify all information before signing.",
+        "edit": "✏️ Edit",
+        "legal_title": "🔒 Privacy & Legal Terms",
+        "legal_agree": "I certify that the information provided is true and correct.",
+        "sign_here": "✍️ Sign Below",
+        "submit": "✅ SUBMIT & FINISH",
         "input_req": "⚠️ Input Required",
         "access_label": "Access Code",
         "firm_login": "⚖️ Firm Login",
@@ -60,7 +67,7 @@ UI_LANG = {
         "logout": "⬅️ LOGOUT",
         "reset": "🔄 RESET / LOGOUT"
     },
-    # (Other languages kept brief for code clarity)
+    # (Additional languages hidden for brevity, but logic remains)
 }
 
 # --- 🔄 STATE INITIALIZATION ---
@@ -72,9 +79,8 @@ if "language" not in st.session_state: st.session_state.language = "🇺🇸 Eng
 if "high_contrast" not in st.session_state: st.session_state.high_contrast = False
 if "font_size" not in st.session_state: st.session_state.font_size = "Normal"
 
-# Helper Function for Translations
+# Helper Function
 def t(key):
-    # Default to English if specific lang missing
     lang_dict = UI_LANG.get(st.session_state.language, UI_LANG["🇺🇸 English"])
     return lang_dict.get(key, key)
 
@@ -86,7 +92,7 @@ elif st.session_state.font_size == "Extra Large":
     font_css = "html, body, [class*='css'] { font-size: 24px !important; }"
 
 if st.session_state.high_contrast:
-    # ⚪ HIGH CONTRAST MODE
+    # ⚪ HIGH CONTRAST
     theme_css = """
     .stApp { background-color: #ffffff !important; color: #000000 !important; }
     div.block-container { background: #ffffff; border: 3px solid #000000; color: black; border-radius: 0px; }
@@ -95,7 +101,7 @@ if st.session_state.high_contrast:
     h1, h2, h3, h4, p, span, div, label { color: #000000 !important; font-family: Arial, sans-serif !important; }
     """
 else:
-    # 🌑 MIDNIGHT FLUX MODE
+    # 🌑 MIDNIGHT FLUX (BRANDED)
     theme_css = """
     .stApp {
         background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1f4068);
@@ -117,9 +123,13 @@ else:
     label, .stRadio, .stCheckbox { color: white !important; }
     button { border: 1px solid #00d4ff !important; color: #00d4ff !important; background: transparent !important; }
     button:hover { background: #00d4ff !important; color: black !important; }
+    
+    /* FORMFLUX BRANDING FOOTER */
+    .footer { position: fixed; bottom: 10px; right: 10px; color: rgba(255,255,255,0.3); font-size: 12px; }
     """
 
 st.markdown(f"<style>{theme_css} {font_css} #MainMenu {{visibility: hidden;}} footer {{visibility: hidden;}}</style>", unsafe_allow_html=True)
+st.markdown('<div class="footer">Powered by FormFluxAI</div>', unsafe_allow_html=True)
 
 # --- ⚡ MAGIC LINK AUTO-LOGIN ---
 query_params = st.query_params
@@ -165,10 +175,18 @@ with st.sidebar:
             st.rerun()
 
 # =========================================================
-# 🏛️ MODE 1: LAWYER DASHBOARD
+# 🏛️ MODE 1: LAWYER DASHBOARD (THE SALES PITCH)
 # =========================================================
 if st.session_state.user_mode == "lawyer":
-    st.title("💼 Firm Command Center")
+    # HEADER BRANDING SHOWCASE
+    c1, c2 = st.columns([3, 1])
+    with c1:
+        st.title(f"💼 {cs.CLIENT_NAME} Dashboard")
+        st.caption(f"Admin: {cs.LAWYER_EMAIL} | Powered by FormFluxAI")
+    with c2:
+        st.info("💡 **Demo Note:** This dashboard is customizable with the Law Firm's logo and colors.")
+    
+    st.divider()
     
     tab_dispatch, tab_inspect, tab_logs = st.tabs(["🚀 Dispatcher", "🔍 PDF Inspector", "🗄️ Client Files"])
     
@@ -184,9 +202,11 @@ if st.session_state.user_mode == "lawyer":
                 magic_link = f"{base_url}/?{query_string}&code=CLIENT-9921"
                 st.success(f"Link Created for {client_name}")
                 st.code(magic_link)
+                st.caption("Copy this link to test the client experience.")
 
     with tab_inspect:
         st.subheader("🛠️ Universal Field Finder")
+        st.markdown("Upload any PDF to auto-detect text fields and checkboxes.")
         uploaded_pdf = st.file_uploader("Upload PDF Template", type="pdf")
         if uploaded_pdf:
             try:
@@ -210,33 +230,32 @@ if st.session_state.user_mode == "lawyer":
 
     with tab_logs:
         st.subheader("Completed Forms")
-        # Load Logs
         df = load_logs()
         if not df.empty:
             st.dataframe(df, use_container_width=True)
-            
-            # SIMULATED DOWNLOAD BUTTON (In production, this links to S3/Blob Storage)
             st.write("### 📥 Download Center")
             col1, col2 = st.columns([3, 1])
             with col1:
-                selected_file = st.selectbox("Select File to Download", df['Timestamp'].astype(str) + " - " + df['Client'] + " (" + df['Form'] + ")")
+                selected_file = st.selectbox("Select File", df['Timestamp'].astype(str) + " - " + df['Client'])
             with col2:
                 st.markdown("<br>", unsafe_allow_html=True)
-                # We simulate a download for the demo. 
-                # In real life, 'data' would be the actual PDF bytes.
-                st.download_button("⬇️ DOWNLOAD PDF", data="Simulated PDF Content", file_name="Completed_Form.pdf")
+                st.download_button("⬇️ DOWNLOAD PDF", data="Simulated PDF", file_name="Form.pdf")
         else:
             st.info("No completed forms yet.")
 
 # =========================================================
-# 🌊 MODE 2: CLIENT INTAKE
+# 🌊 MODE 2: CLIENT INTAKE (THE EXPERIENCE)
 # =========================================================
 else:
     # --- CLIENT LOGIN GATE ---
     if not st.session_state.authenticated:
         c1, c2, c3 = st.columns([1,2,1])
         with c2:
-            st.title(f"🌊 {cs.LOGIN_HEADER}")
+            # SHOWCASE THE LAW FIRM BRANDING HERE
+            st.markdown(f"<h1 style='text-align: center;'>{cs.PAGE_ICON} {cs.CLIENT_NAME}</h1>", unsafe_allow_html=True)
+            st.markdown(f"<p style='text-align: center; opacity: 0.8;'>{cs.TAGLINE}</p>", unsafe_allow_html=True)
+            st.divider()
+            
             st.info(f"{t('welcome')} {t('access_label')}:")
             code = st.text_input(t("access_label"), type="password")
             if st.button(t("start")):
@@ -246,7 +265,7 @@ else:
                 else: st.error("Invalid Code")
         st.stop()
 
-    # --- CLIENT FORM ---
+    # --- CLIENT FORM LOADER ---
     pre_selected_forms = query_params.get_all("form")
     if pre_selected_forms:
         active_form_name = pre_selected_forms[0]
@@ -261,6 +280,7 @@ else:
     
     if "total_steps" not in st.session_state: st.session_state.total_steps = len(fields)
     
+    # --- STAGE 0: WELCOME ---
     if st.session_state.idx == -1:
         st.title(cs.CLIENT_NAME)
         st.write(t("welcome"))
@@ -268,16 +288,14 @@ else:
             st.session_state.idx = 0
             st.rerun()
             
+    # --- STAGE 1: QUESTIONS ---
     elif st.session_state.idx < len(fields):
-        # 1. UNIQUE KEY GENERATION (FIXES STICKY TEXT BUG)
         widget_key = f"input_{st.session_state.idx}"
-        
         curr_field_key = fields[st.session_state.idx]
         field_info = current_config["fields"][curr_field_key]
         
         q_text = wizard.generate_question(curr_field_key)
         
-        # Progress Bar
         progress = (st.session_state.idx / len(fields))
         st.progress(progress, text=f"Question {st.session_state.idx + 1} of {len(fields)}")
         
@@ -285,12 +303,9 @@ else:
         
         ftype = field_info.get("type", "text")
         
-        # --- RENDER INPUTS ---
         if ftype == "text":
             default_val = st.session_state.form_data.get(curr_field_key, "")
-            # KEY FIX IS HERE:
             ans = st.text_input(t("input_req"), value=default_val, key=widget_key, label_visibility="collapsed")
-            
         elif ftype == "radio":
             opts = field_info.get("options", ["Yes", "No"])
             current_idx = 0
@@ -298,7 +313,6 @@ else:
                 try: current_idx = opts.index(st.session_state.form_data[curr_field_key])
                 except: pass
             ans = st.radio("Select:", opts, index=current_idx, key=widget_key)
-            
         elif ftype == "checkbox":
             default_bool = False
             if st.session_state.form_data.get(curr_field_key) == "Yes": default_bool = True
@@ -307,28 +321,79 @@ else:
 
         st.markdown("---")
         c1, c2 = st.columns(2)
-        if c1.button(t("back")):
-            st.session_state.idx -= 1
-            st.rerun()
+        if c1.button(t("back")): st.session_state.idx -= 1; st.rerun()
         if c2.button(t("next")):
             if ans: 
                 st.session_state.form_data[curr_field_key] = ans
                 st.session_state.idx += 1
                 st.rerun()
-            else:
-                st.toast(t("input_req"))
-            
+            else: st.toast(t("input_req"))
+    
+    # --- STAGE 2: REVIEW PAGE ---
     elif st.session_state.idx == len(fields):
-        # SUCCESS STATE
-        st.balloons()
-        st.success(t("submit"))
+        st.markdown(f"### {t('review_title')}")
+        st.markdown(t('review_desc'))
         
-        # HERE IS WHERE WE WOULD GENERATE THE FILE
-        # For the demo, we log it and let the lawyer download it in the dashboard.
-        if st.button("🏁 FINISH & LOGOUT"):
-            # Log the success
-            client_name = st.session_state.form_data.get("Client_Name", "Client")
-            log_submission(client_name, active_form_name, "Completed")
+        # Display answers in a clean table
+        review_data = {"Question": [], "Answer": []}
+        for k, v in st.session_state.form_data.items():
+            desc = current_config["fields"][k]["description"]
+            review_data["Question"].append(desc)
+            review_data["Answer"].append(v)
+        
+        st.table(pd.DataFrame(review_data))
+        
+        c1, c2 = st.columns(2)
+        if c1.button(t('edit')): st.session_state.idx = 0; st.rerun()
+        if c2.button(t('next')): st.session_state.idx += 1; st.rerun()
+
+    # --- STAGE 3: LEGAL & SIGNATURE ---
+    elif st.session_state.idx == len(fields) + 1:
+        st.markdown(f"### {t('legal_title')}")
+        
+        # 1. Privacy & Terms (Collapsed by default)
+        with st.expander("📄 Click to read Privacy Policy & Terms of Service"):
+            st.markdown("""
+            **Privacy Policy:** We value your privacy. Your data is encrypted and only shared with your attorney.
+            **Terms of Service:** By proceeding, you acknowledge that this is an automated intake tool and does not constitute legal advice.
+            **Data Retention:** Your data will be deleted from this portal after submission to the firm.
+            """)
+        
+        # 2. Attestation Checkbox
+        st.divider()
+        agreed = st.checkbox(t('legal_agree'))
+        
+        # 3. Signature
+        if agreed:
+            st.markdown(f"### {t('sign_here')}")
+            st.caption(cs.FINAL_SIGNATURE_TEXT)
             
-            st.session_state.clear()
-            st.rerun()
+            # High Contrast Border Logic
+            border_color = "#000000" if st.session_state.high_contrast else "#00d4ff"
+            st.markdown(f'<div style="border: 2px solid {border_color}; border-radius: 10px;">', unsafe_allow_html=True)
+            
+            # Signature Canvas
+            sig = st_canvas(
+                stroke_width=2, 
+                stroke_color="black" if st.session_state.high_contrast else "white", 
+                background_color="rgba(0,0,0,0)", 
+                height=150, 
+                key="sig"
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            if st.button(t('submit')):
+                if sig.image_data is not None:
+                    # SUCCESS!
+                    st.balloons()
+                    st.success("✅ Form Submitted to Firm.")
+                    
+                    # Log & Reset
+                    client_name = st.session_state.form_data.get("Client_Name", "Client")
+                    log_submission(client_name, active_form_name, "Signed & Completed")
+                    
+                    time.sleep(3)
+                    st.session_state.clear()
+                    st.rerun()
+                else:
+                    st.error("⚠️ Please sign before submitting.")
