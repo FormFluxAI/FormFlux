@@ -1,27 +1,31 @@
-# config.py
-
 FORM_LIBRARY = {
-    # -------------------------------------------------
-    # 📦 THE BUNDLE: "New Client Packet"
-    # -------------------------------------------------
-    # instead of one file, we list THREE files
-    "New Client Packet": {
-        "is_bundle": True,  # <--- New flag to tell the app this is a bundle
-        "files": [
-            "forms/intake_form.pdf",
-            "forms/standard_nda.pdf",
-            "forms/fee_agreement.pdf"
-        ],
-        # The "Master List" of questions for the whole packet
+    "Survey Template": {
+        "filename": "forms/Survey Questions Template Download in MS Word Doc.pdf", 
+        "recipient_email": "justinw1226@gmail.com",
         "fields": {
-            # Shared Data (Goes to ALL forms)
-            "client_name": {"description": "Full Legal Name"},
-            "client_address": {"description": "Current Home Address"},
-            
-            # Form-Specific Data (Only goes to specific forms)
-            "case_description": {"description": "Brief description of legal issue (for Intake)"},
-            "retainer_amount": {"description": "Agreed Retainer Amount (for Fee Agreement)"}
-        },
-        "recipient_email": "admin@smithlegal.com"
+             # I manually created these so you can test the app NOW
+             "Client_Name": { 
+                 "description": "What is your full name?", 
+                 "type": "text" 
+             },
+             "Date_of_Birth": { 
+                 "description": "What is your date of birth?", 
+                 "type": "text" 
+             },
+             "Service_Rating": { 
+                 "description": "How would you rate our service?", 
+                 "type": "radio",
+                 "options": ["Excellent", "Good", "Average", "Poor"]
+             },
+             "Recommend_Us": {
+                 "description": "Would you recommend us to a friend?",
+                 "type": "radio",
+                 "options": ["Yes", "No"]
+             },
+             "Additional_Comments": { 
+                 "description": "Any other feedback?", 
+                 "type": "text" 
+             }
+        }
     }
 }
