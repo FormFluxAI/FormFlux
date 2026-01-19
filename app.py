@@ -35,7 +35,12 @@ except ImportError:
         FINAL_SIGNATURE_TEXT = "Sign below."
         CONSENT_TEXT = "I agree."
 
-st.set_page_config(page_title=cs.APP_TITLE, page_icon=cs.PAGE_ICON, layout="centered")
+st.set_page_config(
+    page_title=cs.APP_TITLE, 
+    page_icon=cs.PAGE_ICON, 
+    layout="centered", 
+    initial_sidebar_state="expanded"  # <--- THIS FORCES IT OPEN
+)
 
 # --- 🛡️ EXIT GUARD ---
 components.html("""
