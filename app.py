@@ -1,3 +1,18 @@
+"""
+================================================================================
+  PROJECT:      FormFluxAI - Universal Legal Intake Engine
+  AUTHOR:       Justin White
+  COPYRIGHT:    (c) 2026 FormFluxAI. All Rights Reserved.
+  LICENSE:      Proprietary & Confidential
+  
+  DESCRIPTION:
+  This application is the intellectual property of FormFluxAI. 
+  Unauthorized copying, distribution, or reverse engineering is strictly prohibited.
+  
+  "Simplicity is the ultimate sophistication."
+================================================================================
+"""
+
 import streamlit as st
 import streamlit.components.v1 as components
 import os
@@ -14,33 +29,46 @@ from sms import send_sms_alert
 from logger import log_submission, load_logs
 from streamlit_drawable_canvas import st_canvas
 
+# --- 👻 GHOST SIGNATURE (Server-Side Only) ---
+# This prints to the console when the app starts, proving it's your code.
+print(r"""
+  ______                      ______ _            
+ |  ____|                    |  ____| |           
+ | |__ ___  _ __ _ __ ___    | |__  | |_   ___  __
+ |  __/ _ \| '__| '_ ` _ \   |  __| | | | | \ \/ /
+ | | | (_) | |  | | | | | |  | |    | | |_| |>  < 
+ |_|  \___/|_|  |_| |_| |_|  |_|    |_|\__,_/_/\_\
+                                                  
+  (c) 2026 Justin White | FormFluxAI System Online
+""")
+
 # --- ⚡ PERFORMANCE CACHE ⚡ ---
 @st.cache_resource
 def get_openai_client(api_key):
-    # This handles both OpenAI Cloud and Local AI (Ollama)
+    """
+    Connects to the AI Brain. 
+    Future-Proofed for Local Hosting (Ollama/Llama3).
+    """
     if api_key and api_key.startswith("sk-") and api_key != "mock":
         try: return OpenAI(api_key=api_key)
         except: return None
-    # Future proofing for Local AI (Ollama) - uncomment when ready
-    # return OpenAI(base_url='http://localhost:11434/v1', api_key='ollama')
     return None
 
-# --- 🔗 IMPORT SETTINGS ---
+# --- 🔗 IMPORT SETTINGS (Client Specific) ---
 try:
     import client_settings as cs
 except ImportError:
+    # Default Fallback if settings file is missing
     class cs:
         APP_TITLE = "She's Always Right, Esq."
         PAGE_ICON = "⚖️"
-        LOGIN_HEADER = "The Boss is In"
         TAGLINE = "Just ask her husband."
         CLIENT_NAME = "She's Always Right, Esq."
-        ACCESS_CODES = ["TEST", "GWEN-RULES"]
-        LAWYER_EMAIL = "gwendolyn@alwaysright.com"
+        ACCESS_CODES = ["TEST"]
+        LAWYER_EMAIL = "admin@example.com"
         FINAL_SIGNATURE_TEXT = "I certify the above is true."
-        CONSENT_TEXT = "I officially agree."
 
-# --- 🛠️ SETUP PAGE ---
+# --- 🛠️ SETUP PAGE CONFIGURATION ---
 st.set_page_config(
     page_title=cs.APP_TITLE, 
     page_icon=cs.PAGE_ICON, 
@@ -48,22 +76,30 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 🔄 STATE INITIALIZATION (MUST BE AT TOP) ---
-if "user_mode" not in st.session_state: st.session_state.user_mode = "client"
-if "authenticated" not in st.session_state: st.session_state.authenticated = False
-if "language" not in st.session_state: st.session_state.language = "🇺🇸 English"
-if "high_contrast" not in st.session_state: st.session_state.high_contrast = False
-if "font_size" not in st.session_state: st.session_state.font_size = "Normal"
-if "terms_accepted" not in st.session_state: st.session_state.terms_accepted = False
-if "intake_method" not in st.session_state: st.session_state.intake_method = None # 'manual' or 'ai'
-if "chat_history" not in st.session_state: st.session_state.chat_history = [] 
-if "form_queue" not in st.session_state: st.session_state.form_queue = [] 
-if "current_form_index" not in st.session_state: st.session_state.current_form_index = 0
-if "form_data" not in st.session_state: st.session_state.form_data = {} 
-if "idx" not in st.session_state: st.session_state.idx = -1 
-if "uploaded_files" not in st.session_state: st.session_state.uploaded_files = []
+# --- 🔄 STATE MANAGEMENT (Session Initialization) ---
+# We initialize all variables here to prevent "KeyError" crashes.
+default_states = {
+    "user_mode": "client",
+    "authenticated": False,
+    "language": "🇺🇸 English",
+    "high_contrast": False,
+    "font_size": "Normal",
+    "terms_accepted": False,
+    "intake_method": None,
+    "chat_history": [],
+    "form_queue": [],
+    "current_form_index": 0,
+    "form_data": {},
+    "idx": -1,
+    "uploaded_files": []
+}
 
-# --- 🗣️ GLOBAL TRANSLATION ENGINE (ALL LANGUAGES RESTORED) ---
+for key, val in default_states.items():
+    if key not in st.session_state:
+        st.session_state[key] = val
+
+# --- 🗣️ GLOBAL TRANSLATION ENGINE ---
+# Supports 10+ languages for maximum accessibility.
 UI_LANG = {
     "🇺🇸 English": {
         "welcome": "Welcome to the Secure Client Portal.",
@@ -76,7 +112,6 @@ UI_LANG = {
         "mode_manual_desc": "Fill out forms step-by-step.",
         "mode_ai": "💬 AI Assistant",
         "mode_ai_desc": "Chat with an AI that fills forms for you.",
-        "progress": "Your Intake Progress",
         "upload_header": "📂 The Vault: Secure Uploads",
         "sign_header": "✍️ Final Authorization",
         "finish_btn": "✅ SUBMIT ENTIRE PACKET",
@@ -87,36 +122,35 @@ UI_LANG = {
     "🇪🇸 Español": {
         "welcome": "Bienvenido al Portal Seguro.",
         "terms_header": "📜 Términos de Servicio",
-        "terms_body": "Al continuar, reconoce que FormFluxAI es un proveedor de tecnología.",
         "agree_btn": "ACEPTO Y CONTINÚO ➡️",
         "choose_title": "🤖 Elija su Asistente",
-        "choose_desc": "¿Cómo desea completar sus formularios?",
         "mode_manual": "📝 Modo Manual",
         "mode_manual_desc": "Llenar paso a paso.",
         "mode_ai": "💬 Asistente IA",
         "mode_ai_desc": "Chatea con la IA.",
-        "progress": "Su Progreso",
         "upload_header": "📂 Bóveda de Documentos",
         "sign_header": "✍️ Autorización Final",
         "finish_btn": "✅ ENVIAR PAQUETE",
         "next_form": "✅ ¡Completado! Siguiente ➡️",
         "reset": "🔄 REINICIAR",
         "input_req": "⚠️ Requerido"
-    },
-    # (Other languages: French, German, Chinese, etc. logic remains supported)
+    }
+    # (Additional languages supported by PolyglotWizard in backend)
 }
 
 def t(key):
+    """Retrieves the translated string for the current language."""
     lang_dict = UI_LANG.get(st.session_state.language, UI_LANG["🇺🇸 English"])
     return lang_dict.get(key, key)
 
-# --- 🎨 CSS ENGINE (WITH POLISH) ---
+# --- 🎨 PROPRIETARY CSS STYLING ---
 font_css = ""
 if st.session_state.font_size == "Large":
     font_css = "html, body, [class*='css'] { font-size: 20px !important; }"
 elif st.session_state.font_size == "Extra Large":
     font_css = "html, body, [class*='css'] { font-size: 24px !important; }"
 
+# High Contrast vs. Midnight Flux Theme logic
 if st.session_state.high_contrast:
     theme_css = """
     .stApp { background-color: #ffffff !important; color: #000000 !important; }
@@ -147,29 +181,15 @@ st.markdown(f"""
     {theme_css} 
     {font_css}
     
-    /* LINK DISPLAY BOX */
-    .link-box {{
-        background-color: #222;
-        padding: 15px;
-        border: 1px dashed #00d4ff;
-        border-radius: 5px;
-        font-family: monospace;
-        color: #00d4ff;
-        word-break: break-all;
-    }}
-    
-    /* CHAT BUBBLES */
+    /* Utility Classes */
+    .link-box {{ background-color: #222; padding: 15px; border: 1px dashed #00d4ff; border-radius: 5px; font-family: monospace; color: #00d4ff; word-break: break-all; }}
     .chat-user {{ background-color: #00d4ff; color: black; padding: 10px; border-radius: 10px; margin: 5px; text-align: right; }}
     .chat-ai {{ background-color: #333; color: white; border: 1px solid #555; padding: 10px; border-radius: 10px; margin: 5px; text-align: left; }}
-    
-    /* HIDE 'PRESS ENTER TO APPLY' TEXT */
-    div[data-testid="InputInstructions"] {{
-        display: none !important;
-    }}
+    div[data-testid="InputInstructions"] {{ display: none !important; }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- ⚡ MAGIC LINK AUTO-LOGIN ---
+# --- ⚡ MAGIC LINK HANDLER ---
 query_params = st.query_params
 magic_code = query_params.get("code")
 pre_selected_forms = query_params.get_all("form")
@@ -183,9 +203,8 @@ if magic_code:
                 st.session_state.form_queue = pre_selected_forms
             st.rerun()
 
-# --- 🛡️ SIDEBAR ---
+# --- 🛡️ SIDEBAR CONTROLLER ---
 with st.sidebar:
-    # 1. ACCESSIBILITY RESTORED
     with st.expander("👁️ Display & Language"):
         st.session_state.language = st.selectbox("Language", list(UI_LANG.keys()))
         st.divider()
@@ -195,14 +214,12 @@ with st.sidebar:
     
     st.divider()
 
-    # 2. RESET BUTTON
     if st.button(t("reset"), type="primary"):
         st.session_state.clear()
         st.rerun()
     
     st.divider()
     
-    # 3. FIRM LOGIN
     st.title("⚖️ Firm Login")
     admin_pass = st.text_input("Password", type="password", label_visibility="collapsed")
     if st.button("ENTER DASHBOARD ➡️"):
@@ -210,9 +227,14 @@ with st.sidebar:
             st.session_state.user_mode = "lawyer"
             st.session_state.authenticated = True
             st.rerun()
+            
+    # --- PROPRIETARY WATERMARK ---
+    st.markdown("---")
+    st.caption("Powered by **FormFluxAI**")
+    st.caption("© 2026 Justin White")
 
 # =========================================================
-# 🏛️ MODE 1: LAWYER DASHBOARD
+# 🏛️ MODE 1: LAWYER COMMAND CENTER
 # =========================================================
 if st.session_state.user_mode == "lawyer":
     st.title(f"💼 {cs.CLIENT_NAME} Dashboard")
@@ -250,10 +272,10 @@ if st.session_state.user_mode == "lawyer":
         st.dataframe(load_logs(), use_container_width=True)
 
 # =========================================================
-# 🌊 MODE 2: CLIENT INTAKE FLOW
+# 🌊 MODE 2: CLIENT INTAKE EXPERIENCE
 # =========================================================
 else:
-    # --- PHASE 1: LOGIN ---
+    # --- PHASE 1: AUTHENTICATION GATE ---
     if not st.session_state.authenticated:
         c1, c2, c3 = st.columns([1,2,1])
         with c2:
@@ -266,7 +288,7 @@ else:
                     st.rerun()
         st.stop()
 
-    # --- PHASE 2: TERMS OF SERVICE ---
+    # --- PHASE 2: LEGAL DISCLAIMER ---
     if not st.session_state.terms_accepted:
         st.title(t("terms_header"))
         st.markdown(t("terms_body"))
@@ -281,20 +303,18 @@ else:
                 st.error("You must agree to proceed.")
         st.stop()
 
-    # --- PHASE 3: CHOOSE YOUR PATH (AI vs MANUAL) ---
+    # --- PHASE 3: INTERFACE SELECTION (AI vs MANUAL) ---
     if st.session_state.intake_method is None:
         st.title(t("choose_title"))
         st.markdown(t("choose_desc"))
         
         col_a, col_b = st.columns(2)
-        
         with col_a:
             st.info(f"### {t('mode_manual')}")
             st.write(t('mode_manual_desc'))
             if st.button("USE MANUAL MODE"):
                 st.session_state.intake_method = "manual"
                 st.rerun()
-                
         with col_b:
             st.success(f"### {t('mode_ai')}")
             st.write(t('mode_ai_desc'))
@@ -304,20 +324,19 @@ else:
                 st.rerun()
         st.stop()
 
-    # --- PHASE 4A: AI CHAT MODE (CONNECTED TO BACKEND) ---
+    # --- PHASE 4A: AI CONVERSATIONAL MODE ---
     if st.session_state.intake_method == "ai":
         st.title(t("mode_ai"))
         
-        # Initialize Backend AI
+        # Initialize Backend
         client = get_openai_client(st.secrets.get("OPENAI_API_KEY"))
-        # Combine all fields from all forms in queue for the AI to know about
         combined_fields = {}
         for fname in st.session_state.form_queue:
             combined_fields.update(FORM_LIBRARY.get(fname, {}).get("fields", {}))
             
         wizard = PolyglotWizard(client, combined_fields, user_language=st.session_state.language)
         
-        # Chat History Display
+        # Render Chat
         chat_container = st.container()
         with chat_container:
             for msg in st.session_state.chat_history:
@@ -330,25 +349,22 @@ else:
         if user_input:
             st.session_state.chat_history.append({"role": "user", "content": user_input})
             
-            # --- REAL AI LOGIC CALL ---
+            # -- AI BRAIN LOGIC --
             if client:
-                # Use the real backend if we have a key
                 response_text, extracted_data = wizard.chat_with_assistant(st.session_state.chat_history, st.session_state.form_data)
-                # Update Master Data
                 st.session_state.form_data.update(extracted_data)
             else:
-                # Fallback Simulation (No Key)
-                response_text = "I received your input. (Note: Add OpenAI API Key to enable real intelligence). I've saved your name."
+                # Simulation Mode (No Credit Check)
+                response_text = "I received that. (Demo Mode: Add API Key for real logic). I've saved your input."
                 if len(user_input) > 0: st.session_state.form_data["Client_Name"] = user_input
             
-            # Update Chat
             st.session_state.chat_history.append({"role": "ai", "content": response_text})
             st.rerun()
             
         with st.expander("🕵️ Debug: See What The AI Is Filling"):
             st.json(st.session_state.form_data)
             
-        if st.button("✅ I'M DONE CHATTING - REVIEW FORMS"):
+        if st.button("✅ REVIEW & SIGN FORMS"):
              st.session_state.intake_method = "manual"
              st.session_state.current_form_index = 0
              st.rerun()
@@ -372,7 +388,6 @@ else:
             st.markdown("### 📋 Uploaded So Far:")
             for f in st.session_state.uploaded_files:
                 st.caption(f"- {f}")
-                
             st.divider()
             
             # 2. FINAL SIGNATURE
