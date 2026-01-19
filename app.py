@@ -45,6 +45,17 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# --- 🔄 STATE INITIALIZATION (MOVED TO TOP TO FIX ERROR) ---
+if "user_mode" not in st.session_state: st.session_state.user_mode = "client"
+if "authenticated" not in st.session_state: st.session_state.authenticated = False
+if "language" not in st.session_state: st.session_state.language = "🇺🇸 English"
+if "terms_accepted" not in st.session_state: st.session_state.terms_accepted = False
+if "form_queue" not in st.session_state: st.session_state.form_queue = [] 
+if "current_form_index" not in st.session_state: st.session_state.current_form_index = 0
+if "form_data" not in st.session_state: st.session_state.form_data = {} 
+if "idx" not in st.session_state: st.session_state.idx = -1 
+if "uploaded_files" not in st.session_state: st.session_state.uploaded_files = []
+
 # --- 🗣️ TRANSLATION DICTIONARY ---
 UI_LANG = {
     "🇺🇸 English": {
@@ -63,16 +74,6 @@ UI_LANG = {
     },
     # (Other languages hidden for brevity)
 }
-
-# --- 🔄 STATE INITIALIZATION ---
-if "user_mode" not in st.session_state: st.session_state.user_mode = "client"
-if "authenticated" not in st.session_state: st.session_state.authenticated = False
-if "terms_accepted" not in st.session_state: st.session_state.terms_accepted = False
-if "form_queue" not in st.session_state: st.session_state.form_queue = [] # List of forms to do
-if "current_form_index" not in st.session_state: st.session_state.current_form_index = 0
-if "form_data" not in st.session_state: st.session_state.form_data = {} # Stores ALL answers
-if "idx" not in st.session_state: st.session_state.idx = -1 # Question Index
-if "uploaded_files" not in st.session_state: st.session_state.uploaded_files = []
 
 # Helper Function
 def t(key):
